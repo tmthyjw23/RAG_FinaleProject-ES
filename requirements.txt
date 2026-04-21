@@ -1,0 +1,7 @@
+fastapi
+uvicorn
+PyPDF2
+chromadb
+google-genai
+ollama
+python-multipart
