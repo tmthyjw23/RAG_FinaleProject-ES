@@ -1,77 +1,137 @@
 import os
+import shutil
 import PyPDF2
 import chromadb
-from fastapi import FastAPI, UploadFile, File, Form
+import ollama
+from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
-from google import genai
-import ollama
 from pydantic import BaseModel
+from dotenv import load_dotenv
 
-# --- KONFIGURASI ---
-# Silakan isi API Key Gemini kamu di sini
-GOOGLE_API_KEY = "AIzaSyDfRJi2IF9n-qwAjTjaTUNoPMpUy1YKpok"
-OLLAMA_MODEL = "glm-5.1:cloud"
+# --- INITIALIZATION ---
+load_dotenv()
+app = FastAPI()
+
+# Inisialisasi Client Ollama (Mengarah ke WSL localhost)
+client = ollama.Client(host='http://localhost:11434')
+
+# Konfigurasi Model & Path
+# Pastikan sudah: ollama pull qwen2.5-coder:3b
+OLLAMA_MODEL = "qwen2.5-coder:3b" 
 CHROMA_DB_PATH = "./chroma_db"
 COLLECTION_NAME = "expert_system_docs"
 
-app = FastAPI()
-gemini_client = genai.Client(api_key=GOOGLE_API_KEY)
-
-# Setup Static Files (untuk melayani HTML/CSS)
+# Setup Static Files untuk Frontend
+if not os.path.exists("static"):
+    os.makedirs("static")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
-# --- LOGIKA RAG ---
-class GeminiEmbeddingFunction:
+# --- LOGIKA EMBEDDING (KONSISTEN) ---
+class OllamaEmbeddingFunction:
+    """Menggunakan Ollama untuk menghasilkan vektor dengan metode yang diminta ChromaDB"""
+    
     def name(self):
-        return "gemini-embedding"
+        return "ollama-embedding"
 
     def __call__(self, input: list[str]) -> list[list[float]]:
+        # Metode ini biasanya digunakan saat menambahkan dokumen (add)
+        return self.embed_documents(input)
+
+    def embed_documents(self, input: list[str]) -> list[list[float]]:
+        """Logika untuk memproses banyak dokumen sekaligus"""
         embeddings = []
         for text in input:
-            response = gemini_client.models.embed_content(model="text-embedding-004", contents=text)
-            embeddings.append(response.embeddings[0].values)
+            try:
+                response = client.embeddings(model=OLLAMA_MODEL, prompt=text)
+                embeddings.append(response['embedding'])
+            except Exception as e:
+                print(f"❌ Error Embedding Documents: {e}")
+                # Kirim vektor nol sesuai dimensi Qwen2.5 (2048)
+                embeddings.append([0.0] * 2048)
         return embeddings
 
+    def embed_query(self, input: list[str]) -> list[list[float]]:
+        """Metode yang dicari ChromaDB saat menjalankan .query()"""
+        # Untuk Ollama, logika embed query sama dengan dokumen
+        return self.embed_documents(input)
+# --- LOGIKA RAG ENGINE ---
 class RAGChatbot:
     def __init__(self):
         self.chroma_client = chromadb.PersistentClient(path=CHROMA_DB_PATH)
-        self.embed_fn = GeminiEmbeddingFunction()
+        self.embed_fn = OllamaEmbeddingFunction()
         self.collection = self.chroma_client.get_or_create_collection(
-            name=COLLECTION_NAME, embedding_function=self.embed_fn
+            name=COLLECTION_NAME, 
+            embedding_function=self.embed_fn
         )
 
-    def process_pdf(self, file):
+    def process_pdf(self, file_path):
         text = ""
-        pdf_reader = PyPDF2.PdfReader(file)
-        for page in pdf_reader.pages:
-            text += page.extract_text() + "\n"
+        with open(file_path, "rb") as f:
+            pdf_reader = PyPDF2.PdfReader(f)
+            for page in pdf_reader.pages:
+                extracted = page.extract_text()
+                if extracted:
+                    text += extracted + "\n"
         
+        # Chunking Logic (Fixed operator << to <)
+        paragraphs = text.split('\n')
         chunks = []
-        chunk_size, overlap = 500, 50
-        for i in range(0, len(text), chunk_size - overlap):
-            chunks.append(text[i : i + chunk_size])
+        current_chunk = ""
+        chunk_size = 800 
         
-        ids = [f"chunk_{i}" for i in range(len(chunks))]
-        self.collection.add(documents=chunks, ids=ids)
-        return len(chunks)
+        for p in paragraphs:
+            if len(current_chunk) + len(p) < chunk_size:
+                current_chunk += p + "\n"
+            else:
+                if current_chunk.strip():
+                    chunks.append(current_chunk.strip())
+                current_chunk = p + "\n"
+        
+        if current_chunk.strip():
+            chunks.append(current_chunk.strip())
+        
+        # Bersihkan chunk kosong/pendek
+        chunks = [c for c in chunks if len(c) > 15]
+        
+        if chunks:
+            # Tambahkan ID unik agar tidak konflik saat upload ulang
+            ids = [f"doc_{os.urandom(4).hex()}_{i}" for i in range(len(chunks))]
+            self.collection.add(documents=chunks, ids=ids)
+            return len(chunks)
+        return 0
 
     def ask(self, query):
-        results = self.collection.query(query_texts=[query], n_results=3)
-        context = "\n".join(results["documents"][0])
+        print(f"🔍 Mencari konteks untuk: {query}")
         
+        # Query ke Vector DB
+        results = self.collection.query(query_texts=[query], n_results=5)
+        
+        if not results["documents"] or not results["documents"][0]:
+            return "Maaf, tidak ada informasi relevan dalam dokumen yang diunggah."
+            
+        context = "\n---\n".join(results["documents"][0])
+        
+        # Prompt Engineering untuk Sistem Pakar
         system_prompt = (
-            f"Kamu adalah asisten ahli. Gunakan HANYA informasi dari KONTEKS di bawah.\n"
-            f"Jika tidak ada di konteks, katakan 'Maaf, tidak ditemukan di dokumen'.\n\n"
-            f"KONTEKS:\n{context}\n\nPERTANYAAN: {query}\n\nJAWABAN:"
+            f"Anda adalah Sistem Pakar yang disiplin. Gunakan konteks berikut untuk menjawab.\n\n"
+            f"KONTEKS:\n{context}\n\n"
+            f"PERTANYAAN: {query}\n\n"
+            f"ATURAN: Jika jawaban tidak ada di konteks, katakan Anda tidak tahu. Jawablah dengan bahasa Indonesia yang baik.\n\n"
+            f"JAWABAN:"
         )
-        response = ollama.generate(model=OLLAMA_MODEL, prompt=system_prompt)
-        return response['response']
+        
+        try:
+            # Memanggil model lokal
+            response = client.generate(model=OLLAMA_MODEL, prompt=system_prompt)
+            return response['response']
+        except Exception as e:
+            return f"❌ Error LLM: {str(e)}"
 
-# Inisialisasi Bot Global
+# Global Instance
 bot = RAGChatbot()
 
-# --- ENDPOINTS API ---
+# --- API ENDPOINTS ---
 
 @app.get("/")
 async def read_index():
@@ -79,25 +139,41 @@ async def read_index():
 
 @app.post("/upload")
 async def upload_pdf(file: UploadFile = File(...)):
-    num_chunks = bot.process_pdf(file.file)
-    return {"status": "success", "message": f"Berhasil memproses {num_chunks} chunk teks."}
+    try:
+        # Simpan file sementara
+        temp_path = f"temp_{file.filename}"
+        with open(temp_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+        
+        num_chunks = bot.process_pdf(temp_path)
+        os.remove(temp_path) # Hapus file temp
+        
+        return {"status": "success", "message": f"Berhasil memproses {num_chunks} potongan teks."}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
 
 @app.post("/chat")
-async def chat(data: dict): # data = {"query": "pertanyaan user"}
+async def chat(data: dict):
     query = data.get("query")
+    if not query:
+        return {"answer": "Silakan masukkan pertanyaan."}
+    
     answer = bot.ask(query)
     return {"answer": answer}
 
 @app.post("/reset")
 async def reset_db():
-    import shutil
-    if os.path.exists(CHROMA_DB_PATH):
-        shutil.rmtree(CHROMA_DB_PATH)
-    # Re-initialize bot to refresh the collection
-    global bot
-    bot = RAGChatbot()
-    return {"status": "success", "message": "Database berhasil dikosongkan."}
+    try:
+        if os.path.exists(CHROMA_DB_PATH):
+            shutil.rmtree(CHROMA_DB_PATH)
+        # Re-inisialisasi bot agar database segar
+        global bot
+        bot = RAGChatbot()
+        return {"status": "success", "message": "Database berhasil dikosongkan."}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
 
 if __name__ == "__main__":
     import uvicorn
+    # Jalankan di port 8000
     uvicorn.run(app, host="0.0.0.0", port=8000)

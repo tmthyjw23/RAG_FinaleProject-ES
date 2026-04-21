@@ -44,7 +44,7 @@ ollama pull glm-5.1:cloud
 ### 4. Konfigurasi API Key
 Buka file `main.py` dan masukkan API Key Gemini kamu pada variabel:
 ```python
-GOOGLE_API_KEY = "ISI_API_KEY_GEMINI_KAMU"
+GOOGLE_API_KEY = "AIzaSyDfRJi2IF9n-qwAjTjaTUNoPMpUy1YKpok"
 ```
 
 ### 5. Menjalankan Aplikasi
