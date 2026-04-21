@@ -23,6 +23,9 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 
 # --- LOGIKA RAG ---
 class GeminiEmbeddingFunction:
+    def name(self):
+        return "gemini-embedding"
+
     def __call__(self, input: list[str]) -> list[list[float]]:
         embeddings = []
         for text in input:
