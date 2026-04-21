@@ -38,7 +38,7 @@ pip install -r requirements.txt
 ### 3. Konfigurasi Model Lokal
 Download model yang ingin digunakan melalui Ollama:
 ```bash
-ollama pull gemma2
+ollama pull glm-5.1:cloud
 ```
 
 ### 4. Konfigurasi API Key

@@ -10,8 +10,8 @@ from pydantic import BaseModel
 
 # --- KONFIGURASI ---
 # Silakan isi API Key Gemini kamu di sini
-GOOGLE_API_KEY = "ISI_API_KEY_GEMINI_KAMU"
-OLLAMA_MODEL = "gemma2"
+GOOGLE_API_KEY = "AIzaSyDfRJi2IF9n-qwAjTjaTUNoPMpUy1YKpok"
+OLLAMA_MODEL = "glm-5.1:cloud"
 CHROMA_DB_PATH = "./chroma_db"
 COLLECTION_NAME = "expert_system_docs"
 
