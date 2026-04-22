@@ -117,7 +117,7 @@ class RAGChatbot:
             f"Anda adalah Sistem Pakar yang disiplin. Gunakan konteks berikut untuk menjawab.\n\n"
             f"KONTEKS:\n{context}\n\n"
             f"PERTANYAAN: {query}\n\n"
-            f"ATURAN: Jika jawaban tidak ada di konteks, katakan Anda tidak tahu. Jawablah dengan bahasa Indonesia yang baik.\n\n"
+            f"ATURAN: Jika jawaban tidak ada di konteks, katakan Anda tidak tahu. Jawablah dengan bahasa Indonesia yang baik.JANGAN MENJAWAB DENGAN KATA KATA YANG TIDAK RELEVAN\n\n"
             f"JAWABAN:"
         )
         
