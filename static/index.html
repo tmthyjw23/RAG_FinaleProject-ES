@@ -1,113 +1,1026 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>RAG Expert Chatbot</title>
-    <style>
-        :root {
-            --primary-color: #4a90e2;
-            --bg-color: #f4f7f6;
-            --chat-bg: #ffffff;
-            --user-msg: #dcf8c6;
-            --bot-msg: #f1f0f0;
-            --text-color: #333;
-        }
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: var(--bg-color); margin: 0; display: flex; height: 100vh; }
-        
-        /* Sidebar */
-        .sidebar { width: 300px; background: #2c3e50; color: white; padding: 20px; display: flex; flex-direction: column; gap: 20px; }
-        .sidebar h2 { font-size: 1.2rem; margin-bottom: 20px; border-bottom: 1px solid #5d6d7e; padding-bottom: 10px; }
-        .upload-section { display: flex; flex-direction: column; gap: 10px; }
-        input[type="file"] { color: white; font-size: 0.8rem; }
-        button { cursor: pointer; padding: 10px; border: none; border-radius: 5px; font-weight: bold; transition: 0.3s; }
-        .btn-primary { background: var(--primary-color); color: white; }
-        .btn-danger { background: #e74c3c; color: white; margin-top: auto; }
-        button:hover { opacity: 0.8; }
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RAG Expert Chatbot</title>
 
-        /* Chat Area */
-        .chat-container { flex: 1; display: flex; flex-direction: column; }
-        #chat-window { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 15px; }
-        .message { max-width: 70%; padding: 12px 16px; border-radius: 15px; line-height: 1.5; position: relative; }
-        .user { align-self: flex-end; background: var(--user-msg); border-bottom-right-radius: 2px; }
-        .bot { align-self: flex-start; background: var(--bot-msg); border-bottom-left-radius: 2px; }
+  <!-- React & Babel -->
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
-        /* Input Area */
-        .input-area { padding: 20px; background: white; display: flex; gap: 10px; border-top: 1px solid #ddd; }
-        input[type="text"] { flex: 1; padding: 12px; border: 1px solid #ddd; border-radius: 25px; outline: none; }
-    </style>
+  <!-- Framer Motion -->
+  <script src="https://cdn.jsdelivr.net/npm/framer-motion@11/dist/framer-motion.umd.min.js"></script>
+
+  <!-- Google Fonts -->
+  <link
+    href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap"
+    rel="stylesheet"
+  />
+
+  <style>
+    /* ===== RESET & ROOT ===== */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --glass-bg: rgba(255, 255, 255, 0.08);
+      --glass-border: rgba(255, 255, 255, 0.18);
+      --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.37);
+      --accent: #7c6af7;
+      --accent2: #a78bfa;
+      --accent3: #c4b5fd;
+      --user-bubble: linear-gradient(135deg, #7c6af7, #a855f7);
+      --bot-bubble: rgba(255, 255, 255, 0.10);
+      --text-primary: #f0eeff;
+      --text-secondary: #b8b0d8;
+      --text-muted: #7a7399;
+      --danger: #f43f5e;
+      --success: #34d399;
+      --font-main: 'Sora', sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+    }
+
+    html, body, #root {
+      height: 100%;
+      width: 100%;
+    }
+
+    body {
+      font-family: var(--font-main);
+      background: linear-gradient(135deg, #0d0b1e 0%, #130f2e 40%, #1a0e3a 70%, #0d1b2e 100%);
+      color: var(--text-primary);
+      min-height: 100vh;
+      overflow: hidden;
+    }
+
+    /* ===== LAYOUT ===== */
+    .app-shell {
+      display: flex;
+      height: 100vh;
+      width: 100%;
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* ===== ANIMATED BACKGROUND ORBS ===== */
+    .bg-orb {
+      position: fixed;
+      border-radius: 50%;
+      filter: blur(80px);
+      pointer-events: none;
+      z-index: 0;
+    }
+    .orb1 {
+      width: 500px; height: 500px;
+      background: radial-gradient(circle, rgba(124,106,247,0.25), transparent 70%);
+      top: -100px; left: -100px;
+    }
+    .orb2 {
+      width: 400px; height: 400px;
+      background: radial-gradient(circle, rgba(168,85,247,0.18), transparent 70%);
+      bottom: -50px; right: 30%;
+      animation: orbFloat 8s ease-in-out infinite alternate;
+    }
+    .orb3 {
+      width: 300px; height: 300px;
+      background: radial-gradient(circle, rgba(99,102,241,0.15), transparent 70%);
+      top: 40%; right: -50px;
+    }
+    @keyframes orbFloat {
+      from { transform: translateY(0); }
+      to   { transform: translateY(-40px); }
+    }
+
+    /* ===== SIDEBAR ===== */
+    .sidebar {
+      width: 300px;
+      min-width: 300px;
+      background: var(--glass-bg);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border-right: 1px solid var(--glass-border);
+      display: flex;
+      flex-direction: column;
+      padding: 24px 20px;
+      gap: 20px;
+      position: relative;
+      z-index: 10;
+    }
+
+    .app-logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+    }
+    .logo-icon {
+      width: 38px; height: 38px;
+      border-radius: 10px;
+      background: linear-gradient(135deg, #7c6af7, #a855f7);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px;
+      flex-shrink: 0;
+      box-shadow: 0 4px 16px rgba(124,106,247,0.4);
+    }
+    .logo-text { font-size: 15px; font-weight: 600; color: var(--text-primary); line-height: 1.2; }
+    .logo-sub  { font-size: 11px; color: var(--text-muted); font-weight: 300; }
+
+    .section-label {
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+    }
+
+    /* ===== UPLOAD ZONE ===== */
+    .upload-zone {
+      border: 1.5px dashed rgba(124,106,247,0.4);
+      border-radius: 14px;
+      padding: 20px 16px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.25s ease;
+      background: rgba(124,106,247,0.04);
+      position: relative;
+      overflow: hidden;
+    }
+    .upload-zone:hover,
+    .upload-zone.drag-over {
+      border-color: var(--accent);
+      background: rgba(124,106,247,0.12);
+      transform: scale(1.01);
+    }
+    .upload-zone input[type="file"] {
+      position: absolute; inset: 0;
+      opacity: 0; cursor: pointer;
+      width: 100%; height: 100%;
+    }
+    .upload-icon { font-size: 28px; margin-bottom: 8px; display: block; }
+    .upload-text { font-size: 12px; color: var(--text-secondary); line-height: 1.5; }
+    .upload-text strong { color: var(--accent3); }
+
+    /* ===== FILE BADGE ===== */
+    .file-badge {
+      display: flex; align-items: center; gap: 8px;
+      background: rgba(124,106,247,0.15);
+      border: 1px solid rgba(124,106,247,0.3);
+      border-radius: 8px;
+      padding: 8px 10px;
+      margin-top: 10px;
+      font-size: 11px;
+      color: var(--accent3);
+      font-family: var(--font-mono);
+    }
+    .file-badge-icon {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--success);
+      flex-shrink: 0;
+      box-shadow: 0 0 6px rgba(52,211,153,0.5);
+    }
+
+    /* ===== STATUS MESSAGES ===== */
+    .status-msg {
+      font-size: 11px;
+      border-radius: 8px;
+      padding: 8px 10px;
+      display: flex; align-items: center; gap: 6px;
+      margin-top: 8px;
+    }
+    .status-msg.success {
+      background: rgba(52,211,153,0.12);
+      color: #6ee7b7;
+      border: 1px solid rgba(52,211,153,0.2);
+    }
+    .status-msg.error {
+      background: rgba(244,63,94,0.12);
+      color: #fda4af;
+      border: 1px solid rgba(244,63,94,0.2);
+    }
+
+    /* ===== BUTTONS ===== */
+    .btn-upload {
+      width: 100%; padding: 9px;
+      border-radius: 10px; border: none; cursor: pointer;
+      background: linear-gradient(135deg, #7c6af7, #a855f7);
+      color: #fff;
+      font-size: 12px; font-weight: 600;
+      font-family: var(--font-main);
+      letter-spacing: 0.3px;
+      margin-top: 10px;
+      box-shadow: 0 4px 20px rgba(124,106,247,0.35);
+      transition: all 0.2s;
+    }
+    .btn-upload:hover:not(:disabled) {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 25px rgba(124,106,247,0.5);
+    }
+    .btn-upload:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+    .btn-reset {
+      width: 100%; padding: 9px;
+      border-radius: 10px; cursor: pointer;
+      background: rgba(244,63,94,0.08);
+      border: 1px solid rgba(244,63,94,0.25);
+      color: #fda4af;
+      font-size: 12px; font-weight: 500;
+      font-family: var(--font-main);
+      transition: all 0.2s;
+      display: flex; align-items: center; justify-content: center; gap: 6px;
+    }
+    .btn-reset:hover:not(:disabled) {
+      background: rgba(244,63,94,0.15);
+      border-color: rgba(244,63,94,0.4);
+      transform: translateY(-1px);
+    }
+    .btn-reset:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+    /* ===== SIDEBAR FOOTER ===== */
+    .sidebar-footer {
+      margin-top: auto;
+      padding-top: 16px;
+      border-top: 1px solid rgba(255,255,255,0.06);
+      font-size: 10px;
+      color: var(--text-muted);
+      text-align: center;
+      line-height: 1.6;
+    }
+    .sidebar-footer span { color: var(--accent3); font-weight: 500; }
+
+    .sidebar-scroll {
+      flex: 1; overflow-y: auto;
+      display: flex; flex-direction: column; gap: 12px;
+    }
+    .sidebar-scroll::-webkit-scrollbar { display: none; }
+
+    /* ===== MAIN CONTENT ===== */
+    .main-content {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      z-index: 5;
+      min-width: 0;
+    }
+
+    .chat-header {
+      padding: 16px 28px;
+      background: rgba(255,255,255,0.04);
+      backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--glass-border);
+      display: flex; align-items: center; gap: 12px;
+    }
+    .chat-header-avatar {
+      width: 36px; height: 36px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #7c6af7, #a855f7);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 16px;
+      box-shadow: 0 0 16px rgba(124,106,247,0.4);
+      position: relative;
+    }
+    .status-dot {
+      position: absolute; bottom: 1px; right: 1px;
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--success);
+      border: 1.5px solid #0d0b1e;
+      box-shadow: 0 0 6px rgba(52,211,153,0.7);
+    }
+    .chat-header-info .title { font-size: 14px; font-weight: 600; color: var(--text-primary); }
+    .chat-header-info .sub  { font-size: 11px; color: var(--text-muted); }
+
+    /* ===== CHAT WINDOW ===== */
+    .chat-window {
+      flex: 1;
+      overflow-y: auto;
+      padding: 24px 28px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      scroll-behavior: smooth;
+    }
+    .chat-window::-webkit-scrollbar { width: 4px; }
+    .chat-window::-webkit-scrollbar-track { background: transparent; }
+    .chat-window::-webkit-scrollbar-thumb {
+      background: rgba(124,106,247,0.3);
+      border-radius: 2px;
+    }
+
+    /* ===== CHAT BUBBLES ===== */
+    .bubble-row {
+      display: flex; gap: 10px;
+      max-width: 75%;
+    }
+    .bubble-row.user { align-self: flex-end; flex-direction: row-reverse; }
+    .bubble-row.bot  { align-self: flex-start; }
+
+    .bubble-avatar {
+      width: 30px; height: 30px;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 13px;
+      flex-shrink: 0;
+      align-self: flex-end;
+    }
+    .bubble-avatar.user-av {
+      background: linear-gradient(135deg, #7c6af7, #a855f7);
+      box-shadow: 0 0 10px rgba(124,106,247,0.3);
+    }
+    .bubble-avatar.bot-av {
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.12);
+    }
+
+    .bubble-content { display: flex; flex-direction: column; gap: 4px; }
+    .bubble-meta { font-size: 10px; color: var(--text-muted); padding: 0 4px; }
+    .bubble-row.user .bubble-meta { text-align: right; }
+
+    .bubble {
+      padding: 12px 16px;
+      border-radius: 16px;
+      font-size: 13.5px;
+      line-height: 1.7;
+      word-break: break-word;
+      position: relative;
+    }
+    .bubble.user {
+      background: var(--user-bubble);
+      color: #fff;
+      border-bottom-right-radius: 4px;
+      box-shadow: 0 4px 20px rgba(124,106,247,0.3);
+    }
+    .bubble.bot {
+      background: var(--bot-bubble);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255,255,255,0.1);
+      color: var(--text-primary);
+      border-bottom-left-radius: 4px;
+    }
+
+    /* ===== TYPING INDICATOR ===== */
+    .typing-indicator {
+      display: flex; align-items: center; gap: 4px;
+      padding: 12px 16px;
+      background: var(--bot-bubble);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 16px;
+      border-bottom-left-radius: 4px;
+    }
+    .typing-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--accent3);
+      animation: typingBounce 1.2s ease-in-out infinite;
+    }
+    .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+    .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+    @keyframes typingBounce {
+      0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+      30%           { transform: translateY(-6px); opacity: 1; }
+    }
+    .typing-label { font-size: 11px; color: var(--text-muted); margin-left: 4px; font-style: italic; }
+
+    /* ===== EMPTY STATE ===== */
+    .empty-state {
+      flex: 1;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 12px;
+      color: var(--text-muted);
+    }
+    .empty-icon  { font-size: 48px; opacity: 0.5; margin-bottom: 8px; }
+    .empty-title { font-size: 16px; font-weight: 600; color: var(--text-secondary); }
+    .empty-sub   { font-size: 12px; text-align: center; max-width: 280px; line-height: 1.6; }
+
+    .suggestion-chips {
+      display: flex; flex-wrap: wrap; gap: 8px;
+      justify-content: center; margin-top: 12px;
+    }
+    .chip {
+      padding: 6px 14px; border-radius: 20px;
+      font-size: 11px;
+      background: rgba(124,106,247,0.1);
+      border: 1px solid rgba(124,106,247,0.25);
+      color: var(--accent3);
+      cursor: pointer; transition: all 0.2s; white-space: nowrap;
+    }
+    .chip:hover {
+      background: rgba(124,106,247,0.2);
+      border-color: var(--accent);
+      transform: translateY(-1px);
+    }
+
+    /* ===== CHAT INPUT ===== */
+    .chat-input-bar {
+      padding: 16px 24px;
+      background: rgba(255,255,255,0.04);
+      backdrop-filter: blur(20px);
+      border-top: 1px solid var(--glass-border);
+    }
+    .input-wrapper {
+      display: flex; align-items: center; gap: 10px;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 14px;
+      padding: 8px 12px;
+      transition: border-color 0.2s;
+    }
+    .input-wrapper:focus-within {
+      border-color: rgba(124,106,247,0.5);
+      box-shadow: 0 0 0 3px rgba(124,106,247,0.1);
+    }
+    .chat-input {
+      flex: 1; background: none; border: none; outline: none;
+      color: var(--text-primary);
+      font-family: var(--font-main);
+      font-size: 13.5px;
+      resize: none;
+      height: 22px; max-height: 120px;
+      line-height: 1.5;
+    }
+    .chat-input::placeholder { color: var(--text-muted); }
+    .chat-input:disabled     { opacity: 0.5; cursor: not-allowed; }
+
+    .send-btn {
+      width: 36px; height: 36px;
+      border-radius: 10px; border: none; cursor: pointer;
+      background: linear-gradient(135deg, #7c6af7, #a855f7);
+      color: #fff;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0; transition: all 0.2s;
+      font-size: 15px;
+      box-shadow: 0 4px 12px rgba(124,106,247,0.3);
+    }
+    .send-btn:hover:not(:disabled) {
+      transform: scale(1.08);
+      box-shadow: 0 6px 18px rgba(124,106,247,0.5);
+    }
+    .send-btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; box-shadow: none; }
+
+    /* ===== SPINNER ===== */
+    .spinner {
+      width: 14px; height: 14px;
+      border: 2px solid rgba(255,255,255,0.2);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.6s linear infinite;
+      display: inline-block;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ===== TECH STACK ITEMS ===== */
+    .tech-item {
+      display: flex; align-items: center; gap: 8px;
+      padding: 6px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+    }
+    .tech-item-label { font-size: 11px; color: var(--text-secondary); font-weight: 500; }
+    .tech-item-sub   { font-size: 10px; color: var(--text-muted); }
+
+    /* ===== MSG COUNT BADGE ===== */
+    .msg-count-badge {
+      font-size: 11px; color: var(--text-muted);
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.1);
+      padding: 4px 10px; border-radius: 20px;
+    }
+
+    /* ===== DIVIDER ===== */
+    .divider {
+      border-top: 1px solid rgba(255,255,255,0.06);
+      padding-top: 16px;
+    }
+
+    /* ===== INPUT HINT ===== */
+    .input-hint {
+      text-align: center; font-size: 10px;
+      color: var(--text-muted); margin-top: 8px;
+    }
+  </style>
 </head>
 <body>
+<div id="root"></div>
 
-    <div class="sidebar">
-        <h2>⚙️ Pengaturan</h2>
-        <div class="upload-section">
-            <label>Upload PDF Dokumen:</label>
-            <input type="file" id="pdfFile" accept="application/pdf">
-            <button class="btn-primary" onclick="uploadFile()">Proses Dokumen</button>
+<script type="text/babel">
+  const { useState, useEffect, useRef } = React;
+  const { motion, AnimatePresence } = Motion;
+
+  /* ========== CONFIG ========== */
+  const API_BASE = "http://localhost:8000";
+
+  /* ========== SUB-COMPONENTS ========== */
+
+  /** Typing indicator dots */
+  function TypingIndicator() {
+    return (
+      <div className="bubble-row bot">
+        <div className="bubble-avatar bot-av">🤖</div>
+        <div className="bubble-content">
+          <div className="bubble-meta">RAG Expert</div>
+          <div className="typing-indicator">
+            <div className="typing-dot" />
+            <div className="typing-dot" />
+            <div className="typing-dot" />
+            <span className="typing-label">sedang mengetik...</span>
+          </div>
         </div>
-        <button class="btn-danger" onclick="resetDB()">Reset Database</button>
-    </div>
+      </div>
+    );
+  }
 
-    <div class="chat-container">
-        <div id="chat-window">
-            <div class="message bot">Halo! Silakan upload PDF di sidebar, lalu tanyakan apa saja tentang dokumen tersebut. 🤖</div>
+  /** Single chat bubble */
+  function ChatBubble({ msg }) {
+    return (
+      <motion.div
+        className={`bubble-row ${msg.role}`}
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: -8 }}
+        transition={{ type: "spring", stiffness: 400, damping: 32 }}
+      >
+        <div className={`bubble-avatar ${msg.role === "user" ? "user-av" : "bot-av"}`}>
+          {msg.role === "user" ? "👤" : "🤖"}
         </div>
-        <div class="input-area">
-            <input type="text" id="userInput" placeholder="Tulis pertanyaan Anda..." onkeypress="handleEnter(event)">
-            <button class="btn-primary" onclick="sendMessage()">Kirim</button>
+        <div className="bubble-content">
+          <div className="bubble-meta">
+            {msg.role === "user" ? "Kamu" : "RAG Expert"} · {msg.time}
+          </div>
+          <div className={`bubble ${msg.role}`} style={{ whiteSpace: "pre-wrap" }}>
+            {msg.text}
+          </div>
         </div>
-    </div>
+      </motion.div>
+    );
+  }
 
-    <script>
-        async function uploadFile() {
-            const fileInput = document.getElementById('pdfFile');
-            if (!fileInput.files[0]) return alert("Pilih file PDF dulu!");
+  /** Scrollable chat messages area */
+  function ChatWindow({ messages, isTyping, onChipClick }) {
+    const endRef = useRef(null);
 
-            const formData = new FormData();
-            formData.append('file', fileInput.files[0]);
+    useEffect(() => {
+      endRef.current?.scrollIntoView({ behavior: "smooth" });
+    }, [messages, isTyping]);
 
-            appendMessage('bot', 'Sedang memproses dokumen, mohon tunggu...');
-            const res = await fetch('/upload', { method: 'POST', body: formData });
-            const data = await res.json();
-            appendMessage('bot', data.message);
+    const suggestions = [
+      "Apa isi dokumen ini?",
+      "Ringkas dokumen secara singkat",
+      "Sebutkan poin-poin utama",
+      "Apa kesimpulan dokumen?",
+    ];
+
+    return (
+      <div className="chat-window">
+        {messages.length === 0 && !isTyping && (
+          <motion.div
+            className="empty-state"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.3 }}
+          >
+            <div className="empty-icon">💬</div>
+            <div className="empty-title">Mulai Percakapan</div>
+            <div className="empty-sub">
+              Upload dokumen PDF terlebih dahulu, lalu ajukan pertanyaan tentang isinya.
+            </div>
+            <div className="suggestion-chips">
+              {suggestions.map((s) => (
+                <motion.div
+                  key={s}
+                  className="chip"
+                  whileHover={{ scale: 1.04 }}
+                  whileTap={{ scale: 0.97 }}
+                  onClick={() => onChipClick(s)}
+                >
+                  {s}
+                </motion.div>
+              ))}
+            </div>
+          </motion.div>
+        )}
+
+        <AnimatePresence initial={false}>
+          {messages.map((msg) => (
+            <ChatBubble key={msg.id} msg={msg} />
+          ))}
+        </AnimatePresence>
+
+        <AnimatePresence>
+          {isTyping && (
+            <motion.div
+              key="typing"
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+            >
+              <TypingIndicator />
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <div ref={endRef} />
+      </div>
+    );
+  }
+
+  /** Bottom chat input bar */
+  function ChatInput({ onSend, disabled }) {
+    const [input, setInput] = useState("");
+    const textareaRef = useRef(null);
+
+    // Expose focus method for chip clicks
+    ChatInput.focusRef = textareaRef;
+
+    const handleSend = () => {
+      const q = input.trim();
+      if (!q || disabled) return;
+      onSend(q);
+      setInput("");
+      if (textareaRef.current) {
+        textareaRef.current.style.height = "22px";
+      }
+    };
+
+    const onKeyDown = (e) => {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        handleSend();
+      }
+    };
+
+    const onInput = (e) => {
+      setInput(e.target.value);
+      e.target.style.height = "22px";
+      e.target.style.height = Math.min(e.target.scrollHeight, 120) + "px";
+    };
+
+    return (
+      <div className="chat-input-bar">
+        <div className="input-wrapper">
+          <textarea
+            ref={textareaRef}
+            className="chat-input"
+            placeholder="Tanyakan sesuatu tentang dokumen..."
+            value={input}
+            onChange={onInput}
+            onKeyDown={onKeyDown}
+            disabled={disabled}
+            rows={1}
+          />
+          <motion.button
+            className="send-btn"
+            onClick={handleSend}
+            disabled={!input.trim() || disabled}
+            whileHover={{ scale: input.trim() && !disabled ? 1.1 : 1 }}
+            whileTap={{ scale: 0.92 }}
+            title="Kirim pesan (Enter)"
+          >
+            {disabled
+              ? <span className="spinner" />
+              : <span>➤</span>
+            }
+          </motion.button>
+        </div>
+        <div className="input-hint">Enter untuk kirim · Shift+Enter untuk baris baru</div>
+      </div>
+    );
+  }
+
+  /** Drag-and-drop upload area */
+  function UploadArea({ onUpload, isUploading, fileName, uploadStatus }) {
+    const [isDragging, setIsDragging] = useState(false);
+    const [selectedFile, setSelectedFile] = useState(null);
+    const fileInputRef = useRef(null);
+
+    const handleFileSelect = (file) => {
+      if (!file) return;
+      if (file.type !== "application/pdf") {
+        // bubble error up via status
+        onUpload(null, "Hanya file PDF yang diterima.");
+        return;
+      }
+      setSelectedFile(file);
+    };
+
+    const onDragEnter = (e) => { e.preventDefault(); setIsDragging(true); };
+    const onDragLeave = (e) => { e.preventDefault(); setIsDragging(false); };
+    const onDrop = (e) => {
+      e.preventDefault();
+      setIsDragging(false);
+      handleFileSelect(e.dataTransfer.files[0]);
+    };
+
+    return (
+      <div>
+        <div className="section-label">Upload Dokumen</div>
+
+        <motion.div
+          className={`upload-zone ${isDragging ? "drag-over" : ""}`}
+          onDragEnter={onDragEnter}
+          onDragOver={(e) => e.preventDefault()}
+          onDragLeave={onDragLeave}
+          onDrop={onDrop}
+          whileHover={{ scale: 1.01 }}
+          whileTap={{ scale: 0.99 }}
+        >
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".pdf"
+            onChange={(e) => handleFileSelect(e.target.files[0])}
+          />
+          <AnimatePresence mode="wait">
+            {isDragging ? (
+              <motion.div key="drag" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                <span className="upload-icon">📂</span>
+                <div className="upload-text"><strong>Lepaskan file di sini!</strong></div>
+              </motion.div>
+            ) : (
+              <motion.div key="idle" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                <span className="upload-icon">📄</span>
+                <div className="upload-text">
+                  <strong>Drag &amp; drop PDF</strong><br />
+                  atau klik untuk memilih
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </motion.div>
+
+        <AnimatePresence>
+          {selectedFile && (
+            <motion.div
+              className="file-badge"
+              initial={{ opacity: 0, y: -5 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+            >
+              <div className="file-badge-icon" />
+              <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "200px" }}>
+                {selectedFile.name}
+              </span>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <AnimatePresence>
+          {uploadStatus && (
+            <motion.div
+              className={`status-msg ${uploadStatus.type}`}
+              initial={{ opacity: 0, y: -4 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+            >
+              {uploadStatus.type === "success" ? "✓" : "✕"} {uploadStatus.msg}
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <motion.button
+          className="btn-upload"
+          onClick={() => onUpload(selectedFile)}
+          disabled={!selectedFile || isUploading}
+          whileHover={{ scale: selectedFile && !isUploading ? 1.02 : 1 }}
+          whileTap={{ scale: 0.98 }}
+        >
+          {isUploading
+            ? <span style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "8px" }}>
+                <span className="spinner" /> Memproses...
+              </span>
+            : "🚀 Upload & Proses PDF"
+          }
+        </motion.button>
+      </div>
+    );
+  }
+
+  /** Left sidebar */
+  function Sidebar({ onUpload, isUploading, fileName, uploadStatus, onReset, isTyping }) {
+    const techStack = [
+      { icon: "⚡", label: "FastAPI",          sub: "Backend" },
+      { icon: "🔮", label: "Gemini Embedding", sub: "Vector Model" },
+      { icon: "🦙", label: "Ollama / Gemma2",  sub: "Local LLM" },
+      { icon: "💾", label: "ChromaDB",         sub: "Vector DB" },
+    ];
+
+    return (
+      <motion.div
+        className="sidebar"
+        initial={{ x: -20, opacity: 0 }}
+        animate={{ x: 0, opacity: 1 }}
+        transition={{ duration: 0.4 }}
+      >
+        {/* Logo */}
+        <div className="app-logo">
+          <div className="logo-icon">🧠</div>
+          <div>
+            <div className="logo-text">RAG Expert</div>
+            <div className="logo-sub">Sistem Pakar Dokumen</div>
+          </div>
+        </div>
+
+        <div className="sidebar-scroll">
+          {/* Upload Section */}
+          <UploadArea
+            onUpload={onUpload}
+            isUploading={isUploading}
+            fileName={fileName}
+            uploadStatus={uploadStatus}
+          />
+
+          {/* Reset Section */}
+          <div className="divider">
+            <div className="section-label">Manajemen</div>
+            <motion.button
+              className="btn-reset"
+              onClick={onReset}
+              disabled={isUploading || isTyping}
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.97 }}
+            >
+              🗑️ Reset Database
+            </motion.button>
+            <div style={{ fontSize: "10px", color: "var(--text-muted)", marginTop: "6px", lineHeight: 1.5 }}>
+              Menghapus semua dokumen yang telah diindeks dan mengosongkan riwayat chat.
+            </div>
+          </div>
+
+          {/* Tech Stack */}
+          <div className="divider">
+            <div className="section-label">Tech Stack</div>
+            {techStack.map((t) => (
+              <div key={t.label} className="tech-item">
+                <span style={{ fontSize: "14px" }}>{t.icon}</span>
+                <div>
+                  <div className="tech-item-label">{t.label}</div>
+                  <div className="tech-item-sub">{t.sub}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="sidebar-footer">
+          Built with <span>RAG Pipeline</span> · Expert System<br />
+          <span>Strict Context Prompting</span>
+        </div>
+      </motion.div>
+    );
+  }
+
+  /* ========== MAIN APP ========== */
+  function App() {
+    const [messages,     setMessages]     = useState([]);
+    const [isTyping,     setIsTyping]     = useState(false);
+    const [isUploading,  setIsUploading]  = useState(false);
+    const [uploadStatus, setUploadStatus] = useState(null);
+    const [fileName,     setFileName]     = useState(null);
+    const chatInputRef = useRef(null);
+
+    /** Helper: add a message to history */
+    const addMsg = (role, text) =>
+      setMessages((prev) => [
+        ...prev,
+        {
+          id:   Date.now() + Math.random(),
+          role,
+          text,
+          time: new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }),
+        },
+      ]);
+
+    /** Upload PDF to /upload */
+    const handleUpload = async (file, errorMsg) => {
+      if (errorMsg) {
+        setUploadStatus({ type: "error", msg: errorMsg });
+        return;
+      }
+      if (!file) return;
+
+      setIsUploading(true);
+      setUploadStatus(null);
+
+      const formData = new FormData();
+      formData.append("file", file);
+
+      try {
+        const res  = await fetch(`${API_BASE}/upload`, { method: "POST", body: formData });
+        const data = await res.json();
+
+        if (res.ok) {
+          setFileName(file.name);
+          setUploadStatus({ type: "success", msg: data.message || "Berhasil diproses!" });
+          addMsg("bot", `📄 Dokumen "${file.name}" berhasil diindeks!\n${data.message}\n\nSilakan ajukan pertanyaan seputar dokumen tersebut.`);
+        } else {
+          setUploadStatus({ type: "error", msg: data.detail || "Upload gagal." });
         }
+      } catch {
+        setUploadStatus({ type: "error", msg: "⚠️ Tidak dapat terhubung ke server." });
+      } finally {
+        setIsUploading(false);
+      }
+    };
 
-        async function sendMessage() {
-            const input = document.getElementById('userInput');
-            const text = input.value.trim();
-            if (!text) return;
+    /** Send query to /chat */
+    const handleSend = async (query) => {
+      addMsg("user", query);
+      setIsTyping(true);
 
-            appendMessage('user', text);
-            input.value = '';
+      try {
+        const res  = await fetch(`${API_BASE}/chat`, {
+          method:  "POST",
+          headers: { "Content-Type": "application/json" },
+          body:    JSON.stringify({ query }),
+        });
+        const data = await res.json();
+        addMsg("bot", data.answer || "Tidak ada respons dari server.");
+      } catch {
+        addMsg("bot", "⚠️ Gagal terhubung ke server. Pastikan backend berjalan di http://localhost:8000");
+      } finally {
+        setIsTyping(false);
+      }
+    };
 
-            const res = await fetch('/chat', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ query: text })
-            });
-            const data = await res.json();
-            appendMessage('bot', data.answer);
-        }
+    /** Reset database via /reset */
+    const handleReset = async () => {
+      try {
+        await fetch(`${API_BASE}/reset`, { method: "POST" });
+      } catch { /* noop */ }
+      setMessages([]);
+      setFileName(null);
+      setUploadStatus(null);
+    };
 
-        async function resetDB() {
-            if(!confirm("Hapus semua memori dokumen?")) return;
-            const res = await fetch('/reset', { method: 'POST' });
-            const data = await res.json();
-            alert(data.message);
-            location.reload();
-        }
+    /** When suggestion chip is clicked */
+    const handleChipClick = (text) => {
+      // Set value into ChatInput via a custom event-like approach
+      // We use a global ref approach
+      if (chatInputRef.current) {
+        chatInputRef.current.value = text;
+        chatInputRef.current.dispatchEvent(new Event("input", { bubbles: true }));
+        chatInputRef.current.focus();
+      }
+    };
 
-        function appendMessage(role, text) {
-            const win = document.getElementById('chat-window');
-            const div = document.createElement('div');
-            div.className = `message ${role}`;
-            div.innerText = text;
-            win.appendChild(div);
-            win.scrollTop = win.scrollHeight;
-        }
+    return (
+      <div className="app-shell">
+        {/* Background orbs */}
+        <div className="bg-orb orb1" />
+        <div className="bg-orb orb2" />
+        <div className="bg-orb orb3" />
 
-        function handleEnter(e) { if(e.key === 'Enter') sendMessage(); }
-    </script>
+        {/* Sidebar */}
+        <Sidebar
+          onUpload={handleUpload}
+          isUploading={isUploading}
+          fileName={fileName}
+          uploadStatus={uploadStatus}
+          onReset={handleReset}
+          isTyping={isTyping}
+        />
+
+        {/* Main Content */}
+        <div className="main-content">
+          {/* Header */}
+          <motion.div
+            className="chat-header"
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+          >
+            <div className="chat-header-avatar">
+              🤖
+              <div className="status-dot" />
+            </div>
+            <div className="chat-header-info">
+              <div className="title">RAG Expert Chatbot</div>
+              <div className="sub">Menjawab hanya berdasarkan dokumen yang diunggah</div>
+            </div>
+            <div style={{ marginLeft: "auto" }}>
+              <div className="msg-count-badge">{messages.length} pesan</div>
+            </div>
+          </motion.div>
+
+          {/* Chat Window */}
+          <ChatWindow
+            messages={messages}
+            isTyping={isTyping}
+            onChipClick={(text) => handleSend(text)}
+          />
+
+          {/* Input */}
+          <ChatInput onSend={handleSend} disabled={isTyping} />
+        </div>
+      </div>
+    );
+  }
+
+  ReactDOM.render(<App />, document.getElementById("root"));
+</script>
 </body>
 </html>
