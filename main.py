@@ -111,23 +111,36 @@ class RAGChatbot:
             return len(chunks)
         return 0
 
-    def ask(self, query):
-        print(f"🔍 Mencari konteks untuk: {query}")
+    def ask(self, query, language="English"):
+        print(f"🔍 Mencari konteks untuk: {query} (Language: {language})")
         
         # Query ke Vector DB
         results = self.collection.query(query_texts=[query], n_results=5)
         
         if not results["documents"] or not results["documents"][0]:
-            return "Maaf, tidak ada informasi relevan dalam dokumen yang diunggah."
+            no_info_msgs = {
+                "Indonesia": "Maaf, tidak ada informasi relevan dalam dokumen yang diunggah.",
+                "English": "Sorry, there is no relevant information in the uploaded document.",
+                "Mandarin": "对不起，上传的文件中没有相关信息。"
+            }
+            return no_info_msgs.get(language, no_info_msgs["English"])
             
         context = "\n---\n".join(results["documents"][0])
         
+        # Mapping bahasa ke instruksi prompt
+        lang_map = {
+            "Indonesia": "bahasa Indonesia",
+            "English": "English",
+            "Mandarin": "Mandarin (Chinese)"
+        }
+        target_lang = lang_map.get(language, "English")
+
         # Prompt Engineering untuk Sistem Pakar
         system_prompt = (
             f"Anda adalah Sistem Pakar yang disiplin. Gunakan konteks berikut untuk menjawab.\n\n"
             f"KONTEKS:\n{context}\n\n"
             f"PERTANYAAN: {query}\n\n"
-            f"ATURAN: Jika jawaban tidak ada di konteks, katakan Anda tidak tahu. Jawablah dengan bahasa Indonesia yang baik.JANGAN MENJAWAB DENGAN KATA KATA YANG TIDAK RELEVAN\n\n"
+            f"ATURAN: Jika jawaban tidak ada di konteks, katakan Anda tidak tahu. Jawablah dengan {target_lang} yang baik. JANGAN MENJAWAB DENGAN KATA KATA YANG TIDAK RELEVAN\n\n"
             f"JAWABAN:"
         )
         
@@ -165,10 +178,11 @@ async def upload_pdf(file: UploadFile = File(...)):
 @app.post("/chat")
 async def chat(data: dict):
     query = data.get("query")
+    language = data.get("language", "English")
     if not query:
         return {"answer": "Silakan masukkan pertanyaan."}
     
-    answer = bot.ask(query)
+    answer = bot.ask(query, language=language)
     return {"answer": answer}
 
 @app.post("/reset")

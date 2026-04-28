@@ -414,23 +414,53 @@
       align-items: flex-end;
     }
 
+    .lang-select {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: var(--text-primary);
+      padding: 0 10px;
+      border-radius: 10px;
+      font-family: var(--font-main);
+      font-size: 12px;
+      height: 40px;
+      outline: none;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      appearance: none;
+      -webkit-appearance: none;
+      text-align: center;
+    }
+    .lang-select:focus {
+      background: rgba(255, 255, 255, 0.12);
+      border-color: rgba(124,106,247,0.5);
+    }
+    .lang-select option {
+      background: #1a0e3a;
+      color: var(--text-primary);
+    }
+
     .chat-input {
       flex: 1;
-      background: rgba(255,255,255,0.08);
-      border: 1px solid rgba(255,255,255,0.1);
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.1);
       color: var(--text-primary);
       padding: 10px 14px;
       border-radius: 10px;
       font-family: var(--font-main);
       font-size: 13px;
-      resize: none;
+      resize: none !important;
       min-height: 40px;
       max-height: 120px;
       outline: none;
       transition: all 0.2s ease;
       line-height: 1.5;
+      overflow-y: auto;
+    }
+    .chat-input::-webkit-resizer {
+      display: none;
     }
     .chat-input:focus {
+
       background: rgba(255,255,255,0.12);
       border-color: rgba(124,106,247,0.5);
       box-shadow: 0 0 12px rgba(124,106,247,0.2);
@@ -576,7 +606,7 @@
     );
   }
 
-  function ChatInput({ onSend, disabled, chatInputRef }) {
+  function ChatInput({ onSend, disabled, chatInputRef, language, setLanguage }) {
     const [input, setInput] = useState("");
     const textareaRef = useRef(null);
 
@@ -615,6 +645,17 @@
     return (
       <div className="chat-input-bar">
         <div className="input-wrapper">
+          <select 
+            className="lang-select" 
+            value={language} 
+            onChange={(e) => setLanguage(e.target.value)}
+            disabled={disabled}
+            title="Pilih bahasa respon AI"
+          >
+            <option value="English">EN</option>
+            <option value="Indonesia">ID</option>
+            <option value="Mandarin">CN</option>
+          </select>
           <textarea
             ref={textareaRef}
             className="chat-input"
@@ -783,6 +824,7 @@
       }
     });
     const [uploadStatus, setUploadStatus] = useState(null);
+    const [language, setLanguage] = useState("English");
     const chatInputRef = useRef(null);
 
     // Simpan messages ke localStorage setiap kali berubah
@@ -851,7 +893,7 @@
         const res = await fetch(`${API_BASE}/chat`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ query }),
+          body: JSON.stringify({ query, language }),
         });
         const data = await res.json();
         addMsg("bot", data.answer || "Tidak ada respons dari server.");
@@ -912,7 +954,13 @@
 
           <ChatWindow messages={messages} isTyping={isTyping} onChipClick={handleChipClick} />
 
-          <ChatInput onSend={handleSend} disabled={isTyping} chatInputRef={chatInputRef} />
+          <ChatInput 
+            onSend={handleSend} 
+            disabled={isTyping} 
+            chatInputRef={chatInputRef} 
+            language={language}
+            setLanguage={setLanguage}
+          />
         </div>
       </div>
     );
