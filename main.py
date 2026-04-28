@@ -28,8 +28,13 @@ client = ollama.Client(host='http://localhost:11434')
 
 # Konfigurasi Model & Path
 # Pastikan sudah: ollama pull qwen2.5-coder:3b
-OLLAMA_MODEL = "qwen2.5-coder:3b" 
-CHROMA_DB_PATH = "./chroma_db"
+OLLAMA_MODEL = "qwen2.5:0.5b"
+
+# Dapatkan lokasi absolut dari file main.py saat ini
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+# Gabungkan dengan nama folder chroma_db
+CHROMA_DB_PATH = os.path.join(BASE_DIR, "chroma_db") 
+
 COLLECTION_NAME = "expert_system_docs"
 
 # Setup Static Files untuk Frontend
