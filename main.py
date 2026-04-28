@@ -6,12 +6,22 @@ import ollama
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from dotenv import load_dotenv
 
 # --- INITIALIZATION ---
 load_dotenv()
 app = FastAPI()
+
+# Enable CORS untuk frontend lokal
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Inisialisasi Client Ollama (Mengarah ke WSL localhost)
 client = ollama.Client(host='http://localhost:11434')
