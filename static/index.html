@@ -177,11 +177,7 @@
       try { return JSON.parse(localStorage.getItem("chatMessages")) || []; } catch { return []; }
     });
     const [files, setFiles] = useState(() => {
-      try { 
-        const saved = JSON.parse(localStorage.getItem("uploadedFiles")) || [];
-        // FILTER: Hanya ambil yang benar-benar string dan bukan "null" atau null
-        return saved.filter(f => f && f !== "null" && typeof f === "string");
-      } catch { return []; }
+      try { return JSON.parse(localStorage.getItem("uploadedFiles")) || []; } catch { return []; }
     });
 
     const [isTyping, setIsTyping] = useState(false);
@@ -317,28 +313,6 @@
       } catch (err) {
         console.error("Upload Error:", err);
         setUploadStatus({ type: "error", msg: "Gagal terhubung ke server." });
-      } finally {
-        setIsUploading(false);
-      }
-    };
-      
-      setIsUploading(true);
-      setUploadStatus(null);
-      const formData = new FormData();
-      formData.append("file", file);
-
-      try {
-        const res = await fetch(`${API_BASE}/upload`, { method: "POST", headers: getHeaders(false), body: formData });
-        const data = await res.json();
-        if (res.ok) {
-          if (!files.includes(data.filename)) setFiles([...files, data.filename]);
-          const successMsg = `📄 Dokumen "${data.filename}" berhasil diindeks!\nBerhasil memproses ${data.num_chunks} potongan teks.\n\nSilakan ajukan pertanyaan seputar dokumen tersebut.`;
-          setUploadStatus({ type: "success", msg: successMsg });
-        } else {
-          setUploadStatus({ type: "error", msg: data.detail || "Upload gagal." });
-        }
-      } catch {
-        setUploadStatus({ type: "error", msg: "Server Error." });
       } finally {
         setIsUploading(false);
       }
