@@ -177,7 +177,11 @@
       try { return JSON.parse(localStorage.getItem("chatMessages")) || []; } catch { return []; }
     });
     const [files, setFiles] = useState(() => {
-      try { return JSON.parse(localStorage.getItem("uploadedFiles")) || []; } catch { return []; }
+      try { 
+        const saved = JSON.parse(localStorage.getItem("uploadedFiles")) || [];
+        // FILTER: Hanya ambil yang benar-benar string dan bukan "null" atau null
+        return saved.filter(f => f && f !== "null" && typeof f === "string");
+      } catch { return []; }
     });
 
     const [isTyping, setIsTyping] = useState(false);
@@ -269,14 +273,54 @@
 
     // 2. Fungsi Utama untuk Memproses File (Dipakai oleh Input & Drag-Drop)
     const processFile = async (file) => {
+      // 1. Validasi awal: Pastikan file ada
       if (!file) return;
-      if (data.filename && !files.includes(data.filename)) {
-            setFiles([...files, data.filename]);
-          }
+
+      // 2. Validasi tipe file (PDF saja)
       if (file.type !== "application/pdf") {
         setUploadStatus({ type: "error", msg: "Hanya PDF yang diterima." });
         return;
       }
+      
+      setIsUploading(true);
+      setUploadStatus(null);
+
+      const formData = new FormData();
+      formData.append("file", file);
+
+      try {
+        // 3. Proses Upload ke Backend
+        const res = await fetch(`${API_BASE}/upload`, { 
+          method: "POST", 
+          headers: getHeaders(false), 
+          body: formData 
+        });
+        
+        const data = await res.json(); // Variabel 'data' didefinisikan di sini
+
+        if (res.ok) {
+          // 4. VALIDASI KETAT: Hanya tambah ke list jika filename valid dan bukan "null"
+          if (data.filename && data.filename !== "null" && typeof data.filename === "string") {
+            setFiles(prev => {
+              if (!prev.includes(data.filename)) {
+                return [...prev, data.filename];
+              }
+              return prev;
+            });
+          }
+
+          const successMsg = `📄 Dokumen "${data.filename}" berhasil diindeks!\nBerhasil memproses ${data.num_chunks} potongan teks.\n\nSilakan ajukan pertanyaan seputar dokumen tersebut.`;
+          setUploadStatus({ type: "success", msg: successMsg });
+        } else {
+          setUploadStatus({ type: "error", msg: data.message || "Upload gagal." });
+        }
+      } catch (err) {
+        console.error("Upload Error:", err);
+        setUploadStatus({ type: "error", msg: "Gagal terhubung ke server." });
+      } finally {
+        setIsUploading(false);
+      }
+    };
       
       setIsUploading(true);
       setUploadStatus(null);
