@@ -34,7 +34,7 @@ app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 # Konfigurasi G4 Local Service
 SECRET_API_KEY = os.getenv("SECRET_API_KEY", "g4-rahasia")
-OLLAMA_MODEL = "qwen2.5:0.5b"
+OLLAMA_MODEL = "qwen2.5-coder:3b"
 local_client = ollama.Client(host='http://localhost:11434')
 
 # --- SECURITY & ROUTING DEPENDENCY ---
@@ -258,7 +258,12 @@ async def upload_pdf(file: UploadFile = File(...), auth_ctx: dict = Depends(get_
 
         num_chunks = bot.process_pdf(temp_path, file.filename, auth_ctx["session_id"])
         os.remove(temp_path)
-        return {"status": "success", "message": f"Berhasil memproses dokumen.", "filename": file.filename}
+        # Kita kirim num_chunks ke frontend
+        return {
+            "status": "success", 
+            "num_chunks": num_chunks, 
+            "filename": file.filename
+        }
     except Exception as e:
         return {"status": "error", "message": str(e)}
 
