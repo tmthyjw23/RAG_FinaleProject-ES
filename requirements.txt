@@ -5,3 +5,4 @@ chromadb
 google-genai
 ollama
 python-multipart
+openai

@@ -1,70 +1,60 @@
-# 🤖 RAG Expert Chatbot
+# 🚀 G4 Expert System: Multi-Tenant RAG Chatbot
 
-Sistem Pakar berbasis **Retrieval-Augmented Generation (RAG)** yang memungkinkan pengguna untuk berinteraksi dengan dokumen PDF. Chatbot ini dirancang untuk memberikan jawaban yang akurat dan terkontrol hanya berdasarkan isi dokumen yang diunggah, guna meminimalisir halusinasi AI.
+Sistem Pakar berbasis **Retrieval-Augmented Generation (RAG)** modern yang dirancang untuk lingkungan *Multi-Tenant*. Chatbot ini mengizinkan pengguna untuk berinteraksi dengan dokumen PDF dalam ruang kerja (sesi) yang terisolasi. Dibangun dengan fleksibilitas tinggi, sistem ini mendukung mode komputasi hibrida yang memungkinkan pengguna memilih antara pemrosesan AI lokal berorientasi privasi atau kekuatan *Cloud GenAI*.
 
 ## 📌 Overview
-Proyek ini dibangun untuk memenuhi tugas mata kuliah **Expert System**. Fokus utama dari sistem ini adalah implementasi pipeline RAG yang menggabungkan keunggulan *Cloud Embedding* (untuk akurasi pencarian) dan *Local LLM* (untuk privasi dan efisiensi biaya).
+Proyek ini dikembangkan sebagai implementasi tingkat lanjut dari Sistem Pakar. Dengan menerapkan **Strict Context Prompting** dan **Session-based Metadata Filtering**, sistem menjamin bahwa respons AI hanya berasal dari dokumen relevan yang diunggah oleh pengguna di sesi aktifnya, mencegah kebocoran data antar pengguna (*data bleed*) dan meminimalisir halusinasi AI.
 
-### Alur Kerja Sistem:
-1. **Indexing**: Dokumen PDF diunggah $\rightarrow$ Teks diekstrak $\rightarrow$ Teks dipecah menjadi *chunks* $\rightarrow$ Diubah menjadi vektor menggunakan **Gemini Embedding API** $\rightarrow$ Disimpan di **ChromaDB**.
-2. **Retrieval**: Pertanyaan user diubah menjadi vektor $\rightarrow$ Sistem mencari potongan teks paling relevan di ChromaDB.
-3. **Generation**: Potongan teks relevan (konteks) + pertanyaan user dikirim ke **Ollama (Local LLM)** dengan instruksi ketat untuk hanya menjawab berdasarkan konteks tersebut.
+### ✨ Fitur Utama
+*   🔐 **Multi-Tenant Document Isolation:** Setiap pengunjung secara otomatis mendapatkan *Session ID* unik. Dokumen yang diunggah dan vektor yang di-*embed* disegel dengan *metadata* sesi, memastikan privasi absolut.
+*   🔀 **Hybrid LLM Routing:** Tersedia *toggle* mode layanan:
+    *   **G4 Local:** Menggunakan model lokal (Ollama) yang berjalan langsung di VPS untuk privasi 100%. Dilindungi oleh *Master Password*.
+    *   **Cloud BYOK (Bring Your Own Key):** Menggunakan *library* OpenAI-compatible untuk menghubungkan API Key pribadi pengguna ke layanan eksternal (Groq, OpenRouter, Gemini, dll).
+*   🧠 **Contextual Chat Memory:** Sistem RAG tidak hanya membaca dokumen, tetapi juga "mengingat" 4 interaksi terakhir untuk memberikan jawaban yang berkesinambungan (*follow-up questions*).
+*   📄 **Granular File Management:** Kemampuan untuk menghapus dokumen spesifik (PDF) secara aman dari *Vector Database* tanpa merusak dokumen lain di sesi yang sama.
+*   🛡️ **API Security:** Perlindungan *endpoint* menggunakan autentikasi *Bearer Token* (`HTTPBearer`).
 
 ---
 
 ## 🛠️ Tech Stack
-- **Backend**: [FastAPI](https://fastapi.tiangolo.com/) (Python)
-- **Frontend**: HTML5 & CSS3 (Custom UI)
-- **Vector Database**: [ChromaDB](https://www.trychroma.com/)
-- **Embedding Model**: Google Gemini `text-embedding-004` (Cloud API)
-- **Large Language Model (LLM)**: [Ollama](https://ollama.com/) (Local Model: `gemma2` / `llama3`)
-- **PDF Parsing**: PyPDF2
+
+### Backend & AI Pipeline
+*   **Framework:** [FastAPI](https://fastapi.tiangolo.com/) (Python)
+*   **Vector Database:** [ChromaDB](https://www.trychroma.com/) (Local Persistent)
+*   **Local LLM Engine:** [Ollama](https://ollama.com/) (Model: `qwen2.5:0.5b`)
+*   **Cloud Gateway:** [OpenAI Python SDK](https://github.com/openai/openai-python)
+*   **Document Parsing:** PyPDF2
+
+### Frontend & UI
+*   **Library:** React.js 18 (Standalone via Babel)
+*   **Styling:** Custom CSS3 (Modern Glassmorphism, Responsive)
+*   **State Management:** LocalStorage & SessionStorage untuk persistensi sesi.
+
+### Production Environment
+*   **OS:** OpenCloudOS (Linux VPS)
+*   **Process Manager:** `systemd` (Uvicorn Workers)
+*   **Tunneling/Proxy:** Cloudflare Tunnels (Zero Trust Network Access)
 
 ---
 
-## 🚀 Instalasi & Penggunaan
+## ⚙️ Alur Kerja Sistem (Pipeline)
+
+1. **Ingestion & Isolation**: PDF Diunggah -> Teks diekstraksi & di-*chunk* -> Di-*embed* menggunakan Ollama -> Disimpan ke ChromaDB dengan sisipan Metadata `{"session_id": "uuid", "filename": "doc.pdf"}`.
+2. **Context Retrieval**: Pertanyaan User -> Filter pencarian ChromaDB membatasi target hanya pada dokumen dengan `session_id` yang sesuai -> Potongan teks relevan diekstraksi.
+3. **Prompt Construction**: Konteks PDF + Riwayat Obrolan (Memori) + Pertanyaan Baru digabungkan menjadi satu *System Prompt* yang ketat.
+4. **Generation (Dynamic Routing)**: Berdasarkan mode yang dipilih, prompt dikirim ke lokal (Ollama) atau dikirim ke Cloud Gateway menggunakan *API Key* pengguna.
+
+---
+
+## 🚀 Panduan Instalasi & Penggunaan Lokal
 
 ### 1. Prasyarat
-- Python 3.10+
-- Ollama terinstall di lokal
-- API Key dari [Google AI Studio](https://aistudio.google.com/)
+*   Python 3.10+
+*   [Ollama](https://ollama.com/download) terinstal di sistem operasi Anda.
 
 ### 2. Setup Environment
-Kloning folder project atau masuk ke direktori project, lalu install dependencies:
+Kloning repositori ini, lalu masuk ke direktori proyek dan instal semua *dependencies*:
 ```bash
+git clone [https://github.com/tmthyjw23/RAG_FinaleProject-ES.git](https://github.com/tmthyjw23/RAG_FinaleProject-ES.git
+cd G4-Expert-System
 pip install -r requirements.txt
-```
-
-### 3. Konfigurasi Model Lokal
-Download model yang ingin digunakan melalui Ollama:
-```bash
-ollama pull glm-5.1:cloud
-```
-
-### 4. Konfigurasi API Key
-Buka file `main.py` dan masukkan API Key Gemini kamu pada variabel:
-```python
-GOOGLE_API_KEY = "AIzaSyDfRJi2IF9n-qwAjTjaTUNoPMpUy1YKpok"
-```
-
-### 5. Menjalankan Aplikasi
-Jalankan server FastAPI:
-```bash
-python main.py
-```
-Buka browser dan akses: `http://localhost:8000`
-
----
-
-## 📁 Struktur Folder
-```text
-FINALEPROJECT/
-├── static/
-│   └── index.html      # Tampilan antarmuka chat (Frontend)
-├── chroma_db/           # Penyimpanan vektor dokumen (Otomatis)
-├── main.py             # Logika Backend, API, dan RAG Pipeline
-└── requirements.txt     # Daftar library Python yang dibutuhkan
-```
-
-## 🎓 Catatan Akademik (Expert System)
-Sistem ini menerapkan **Strict Context Prompting**. Berbeda dengan chatbot umum, sistem ini tidak menggunakan pengetahuan umum LLM jika informasi tidak tersedia di dokumen. Hal ini memastikan bahwa sistem berperan sebagai *Expert* pada domain dokumen tertentu, yang merupakan karakteristik utama dari sebuah Sistem Pakar.
