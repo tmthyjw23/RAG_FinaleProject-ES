@@ -268,11 +268,12 @@ async def upload_pdf(file: UploadFile = File(...), auth_ctx: dict = Depends(get_
         return {"status": "error", "message": str(e)}
 
 @app.post("/delete_file")
-async def delete_file(req: DeleteRequest, auth_ctx: dict = Depends(get_auth_context)):
-    success = bot.delete_document(req.filename, auth_ctx["session_id"])
+async def delete_file(data: DeleteRequest, auth_ctx: dict = Depends(get_auth_context)):
+    print(f"DEBUG: Mencoba menghapus {data.filename} untuk sesi {auth_ctx['session_id']}")
+    success = bot.delete_document(data.filename, auth_ctx["session_id"])
     if success:
         return {"status": "success"}
-    raise HTTPException(status_code=500, detail="Gagal menghapus file.")
+    raise HTTPException(status_code=500, detail="Gagal menghapus file di database.")
 
 @app.post("/chat")
 async def chat(data: ChatRequest, auth_ctx: dict = Depends(get_auth_context)):

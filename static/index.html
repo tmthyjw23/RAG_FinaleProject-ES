@@ -325,12 +325,13 @@
     };
 
     const handleDeleteFile = async (filename) => {
+      console.log("Menghapus file:", filename); // Cek apakah ini string atau objek
       try {
-        const res = await fetch(`${API_BASE}/delete_file`, { method: "POST", headers: getHeaders(true), body: JSON.stringify({ filename }) });
-        if (res.ok) {
-          setFiles(files.filter(f => f !== filename));
-          setUploadStatus({ type: "success", msg: `File dihapus.` });
-        }
+        const res = await fetch(`${API_BASE}/delete_file`, { 
+          method: "POST", 
+          headers: getHeaders(true), 
+          body: JSON.stringify({ filename: String(filename) }) // Paksa menjadi string
+        });
       } catch { setUploadStatus({ type: "error", msg: "Gagal menghapus file." }); }
     };
 
