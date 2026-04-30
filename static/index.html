@@ -5,12 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>RAG Expert Chatbot</title>
 
-  <!-- React -->
   <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
-  <!-- Google Fonts -->
   <link
     href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap"
     rel="stylesheet"
@@ -138,11 +136,15 @@
       position: relative;
       overflow: hidden;
     }
-    .upload-zone:hover,
+    .upload-zone:hover:not(.disabled),
     .upload-zone.drag-over {
       border-color: var(--accent);
       background: rgba(124,106,247,0.08);
       transform: scale(1.01);
+    }
+    .upload-zone.disabled {
+      cursor: default;
+      opacity: 0.8;
     }
     .upload-zone input[type="file"] {
       position: absolute; inset: 0;
@@ -207,6 +209,28 @@
     .btn-reset:disabled {
       opacity: 0.5;
       cursor: not-allowed;
+    }
+
+    /* API Input Styles */
+    .api-input-wrapper {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .api-input {
+      width: 100%;
+      background: rgba(255, 255, 255, 0.8);
+      border: 1px solid rgba(0,0,0,0.1);
+      padding: 8px 10px;
+      border-radius: 8px;
+      font-family: var(--font-main);
+      font-size: 11px;
+      outline: none;
+      transition: all 0.2s ease;
+    }
+    .api-input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 8px rgba(124,106,247,0.1);
     }
 
     .tech-item {
@@ -513,6 +537,18 @@
       border-radius: 50%;
       animation: spin 0.8s linear infinite;
     }
+    
+    /* New Spinner for Upload Area */
+    .upload-spinner-large {
+      display: inline-block;
+      width: 32px; height: 32px;
+      border: 3px solid rgba(124,106,247,0.2);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin-bottom: 8px;
+    }
+
     @keyframes spin {
       to { transform: rotate(360deg); }
     }
@@ -695,7 +731,7 @@
     const fileInputRef = useRef(null);
 
     const handleFileSelect = (file) => {
-      if (!file) return;
+      if (!file || isUploading) return;
       if (file.type !== "application/pdf") {
         onUpload(null, "Hanya file PDF yang diterima.");
         return;
@@ -703,39 +739,50 @@
       onUpload(file, null);
     };
 
-    const onDragEnter = (e) => { e.preventDefault(); setIsDragging(true); };
+    const onDragEnter = (e) => { e.preventDefault(); if(!isUploading) setIsDragging(true); };
     const onDragLeave = (e) => { e.preventDefault(); setIsDragging(false); };
     const onDrop = (e) => {
       e.preventDefault();
       setIsDragging(false);
-      handleFileSelect(e.dataTransfer.files[0]);
+      if(!isUploading) handleFileSelect(e.dataTransfer.files[0]);
     };
 
     return (
       <div>
         <div className="section-label">Upload Dokumen</div>
 
-        <div
-          className={`upload-zone ${isDragging ? "drag-over" : ""}`}
-          onDragEnter={onDragEnter}
-          onDragOver={(e) => e.preventDefault()}
-          onDragLeave={onDragLeave}
-          onDrop={onDrop}
-        >
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".pdf"
-            onChange={(e) => handleFileSelect(e.target.files[0])}
-          />
-          <span className="upload-icon">{isDragging ? "📂" : "📄"}</span>
-          <div className="upload-text">
-            <strong>{isDragging ? "Lepaskan file di sini!" : "Drag & drop PDF"}</strong><br />
-            {!isDragging && "atau klik untuk memilih"}
+        {isUploading ? (
+          <div className="upload-zone disabled">
+            <div className="upload-spinner-large"></div>
+            <div className="upload-text">
+              <strong>Mengunggah & Memproses...</strong><br />
+              Mohon tunggu sebentar
+            </div>
           </div>
-        </div>
+        ) : (
+          <div
+            className={`upload-zone ${isDragging ? "drag-over" : ""}`}
+            onDragEnter={onDragEnter}
+            onDragOver={(e) => e.preventDefault()}
+            onDragLeave={onDragLeave}
+            onDrop={onDrop}
+          >
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".pdf"
+              onChange={(e) => handleFileSelect(e.target.files[0])}
+              disabled={isUploading}
+            />
+            <span className="upload-icon">{isDragging ? "📂" : "📄"}</span>
+            <div className="upload-text">
+              <strong>{isDragging ? "Lepaskan file di sini!" : "Drag & drop PDF"}</strong><br />
+              {!isDragging && "atau klik untuk memilih"}
+            </div>
+          </div>
+        )}
 
-        {fileName && (
+        {fileName && !isUploading && (
           <div className="file-badge">
             <div style={{ width: "6px", height: "6px", background: "var(--success)", borderRadius: "50%", flexShrink: 0 }} />
             {fileName}
@@ -751,7 +798,7 @@
     );
   }
 
-  function Sidebar({ onUpload, isUploading, fileName, uploadStatus, onReset, isTyping }) {
+  function Sidebar({ onUpload, isUploading, fileName, uploadStatus, onReset, isTyping, apiKey, setApiKey }) {
     const techStack = [
       { icon: "⚡", label: "FastAPI",          sub: "Backend" },
       { icon: "🔮", label: "Ollama Embedding", sub: "Vector Model" },
@@ -792,6 +839,23 @@
           </div>
         </div>
 
+        {/* API Key Section */}
+        <div className="divider">
+          <div className="section-label">Keamanan API</div>
+          <div className="api-input-wrapper">
+            <input
+              type="password"
+              className="api-input"
+              placeholder="Masukkan API Key (Opsional)"
+              value={apiKey}
+              onChange={(e) => setApiKey(e.target.value)}
+            />
+            <div style={{ fontSize: "10px", color: "var(--text-muted)", lineHeight: 1.5 }}>
+              Key disimpan aman di <strong>Session Storage</strong>. Otomatis terhapus saat tab ditutup.
+            </div>
+          </div>
+        </div>
+
         <div className="divider">
           <div className="section-label">Tech Stack</div>
           {techStack.map((t) => (
@@ -824,6 +888,16 @@
         return [];
       }
     });
+    
+    // Gunakan sessionStorage untuk API Key agar hanya bertahan selama sesi tab terbuka
+    const [apiKey, setApiKey] = useState(() => {
+      try {
+        return sessionStorage.getItem("customApiKey") || "";
+      } catch {
+        return "";
+      }
+    });
+
     const [isTyping, setIsTyping] = useState(false);
     const [isUploading, setIsUploading] = useState(false);
     const [fileName, setFileName] = useState(() => {
@@ -859,6 +933,27 @@
       }
     }, [fileName]);
 
+    // Simpan API Key ke sessionStorage setiap kali berubah
+    useEffect(() => {
+      try {
+        if (apiKey) {
+          sessionStorage.setItem("customApiKey", apiKey);
+        } else {
+          sessionStorage.removeItem("customApiKey");
+        }
+      } catch {
+        console.log("Failed to save API key to sessionStorage");
+      }
+    }, [apiKey]);
+
+    // Helper untuk membuat request header
+    const getHeaders = (isJson = false) => {
+      const headers = {};
+      if (isJson) headers["Content-Type"] = "application/json";
+      if (apiKey) headers["Authorization"] = `Bearer ${apiKey}`; // Sesuaikan jika backend Anda menggunakan header khusus seperti X-API-Key
+      return headers;
+    };
+
     const addMsg = (role, text) => {
       const time = new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
       setMessages((prev) => [...prev, { id: Date.now(), role, text, time }]);
@@ -878,13 +973,17 @@
       formData.append("file", file);
 
       try {
-        const res = await fetch(`${API_BASE}/upload`, { method: "POST", body: formData });
+        const res = await fetch(`${API_BASE}/upload`, { 
+          method: "POST", 
+          headers: getHeaders(false), // FormData tidak boleh di-set Content-Type-nya secara manual
+          body: formData 
+        });
         const data = await res.json();
 
         if (res.ok) {
           setFileName(file.name);
           setUploadStatus({ type: "success", msg: data.message || "Berhasil diproses!" });
-          addMsg("bot", `📄 Dokumen "${file.name}" berhasil diindeks!\n${data.message}\n\nSilakan ajukan pertanyaan seputar dokumen tersebut.`);
+          addMsg("bot", `📄 Dokumen "${file.name}" berhasil diindeks!\n${data.message || ""}\n\nSilakan ajukan pertanyaan seputar dokumen tersebut.`);
         } else {
           setUploadStatus({ type: "error", msg: data.detail || "Upload gagal." });
         }
@@ -902,9 +1001,16 @@
       try {
         const res = await fetch(`${API_BASE}/chat`, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: getHeaders(true),
           body: JSON.stringify({ query, language }),
         });
+        
+        if (res.status === 401 || res.status === 403) {
+          addMsg("bot", "⚠️ Akses ditolak. Pastikan API Key yang Anda masukkan valid.");
+          setIsTyping(false);
+          return;
+        }
+
         const data = await res.json();
         addMsg("bot", data.answer || "Tidak ada respons dari server.");
       } catch {
@@ -916,12 +1022,15 @@
 
     const handleReset = async () => {
       try {
-        await fetch(`${API_BASE}/reset`, { method: "POST" });
+        await fetch(`${API_BASE}/reset`, { 
+          method: "POST",
+          headers: getHeaders(false)
+        });
       } catch { }
       setMessages([]);
       setFileName(null);
       setUploadStatus(null);
-      // Hapus dari localStorage
+      
       try {
         localStorage.removeItem("chatMessages");
         localStorage.removeItem("uploadedFileName");
@@ -945,6 +1054,8 @@
           uploadStatus={uploadStatus}
           onReset={handleReset}
           isTyping={isTyping}
+          apiKey={apiKey}
+          setApiKey={setApiKey}
         />
 
         <div className="main-content">
