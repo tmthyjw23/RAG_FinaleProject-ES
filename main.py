@@ -105,7 +105,7 @@ class HybridEmbeddingFunction:
                 embeddings.append(response['embedding'])
             except Exception as e:
                 print(f"❌ Error Embedding: {e}")
-                embeddings.append([0.0] * 2048)
+                embeddings.append([0.0] * 896)
         return embeddings
 
     def embed_query(self, input: list[str]) -> list[list[float]]:
