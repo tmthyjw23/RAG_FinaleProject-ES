@@ -270,6 +270,9 @@
     // 2. Fungsi Utama untuk Memproses File (Dipakai oleh Input & Drag-Drop)
     const processFile = async (file) => {
       if (!file) return;
+      if (data.filename && !files.includes(data.filename)) {
+            setFiles([...files, data.filename]);
+          }
       if (file.type !== "application/pdf") {
         setUploadStatus({ type: "error", msg: "Hanya PDF yang diterima." });
         return;
@@ -325,14 +328,21 @@
     };
 
     const handleDeleteFile = async (filename) => {
-      console.log("Menghapus file:", filename); // Cek apakah ini string atau objek
+      if (!filename || filename === "null") return; // Jangan kirim jika tidak valid
+      
       try {
         const res = await fetch(`${API_BASE}/delete_file`, { 
           method: "POST", 
           headers: getHeaders(true), 
-          body: JSON.stringify({ filename: String(filename) }) // Paksa menjadi string
+          body: JSON.stringify({ filename: filename }) 
         });
-      } catch { setUploadStatus({ type: "error", msg: "Gagal menghapus file." }); }
+        if (res.ok) {
+          setFiles(prev => prev.filter(f => f !== filename));
+          setUploadStatus({ type: "success", msg: `File ${filename} berhasil dihapus dari sistem.` });
+        }
+      } catch { 
+        setUploadStatus({ type: "error", msg: "Gagal menghubungi AI Gateway." }); 
+      }
     };
 
     const handleSend = async () => {
