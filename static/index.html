@@ -70,6 +70,12 @@
 
     .upload-zone { border: 1.5px dashed rgba(0,0,0,0.2); border-radius: 14px; padding: 20px 16px; text-align: center; cursor: pointer; transition: all 0.25s ease; background: rgba(255,255,255,0.4); position: relative; overflow: hidden; }
     .upload-zone:hover:not(.disabled) { border-color: var(--accent); background: white; }
+    .upload-zone.dragging {
+      border-color: var(--accent);
+      background: rgba(0, 0, 0, 0.05);
+      transform: scale(1.02);
+      box-shadow: 0 8px 24px rgba(0,0,0,0.05);
+    }
     .upload-zone.disabled { cursor: default; opacity: 0.8; }
     .upload-zone input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
     .upload-icon { font-size: 24px; margin-bottom: 8px; display: block; }
@@ -258,34 +264,64 @@
       }
     };
 
-    const handleUpload = async (e) => {
-      const file = e.target.files?.[0];
+    // 1. Tambahkan state baru untuk efek dragging
+    const [isDragging, setIsDragging] = useState(false);
+
+    // 2. Fungsi Utama untuk Memproses File (Dipakai oleh Input & Drag-Drop)
+    const processFile = async (file) => {
       if (!file) return;
       if (file.type !== "application/pdf") {
         setUploadStatus({ type: "error", msg: "Hanya PDF yang diterima." });
         return;
       }
-      setIsUploading(true); setUploadStatus(null);
-      const formData = new FormData(); formData.append("file", file);
+      
+      setIsUploading(true);
+      setUploadStatus(null);
+      const formData = new FormData();
+      formData.append("file", file);
 
       try {
         const res = await fetch(`${API_BASE}/upload`, { method: "POST", headers: getHeaders(false), body: formData });
         const data = await res.json();
         if (res.ok) {
           if (!files.includes(data.filename)) setFiles([...files, data.filename]);
-          
-          // Format pesan sesuai permintaanmu
           const successMsg = `📄 Dokumen "${data.filename}" berhasil diindeks!\nBerhasil memproses ${data.num_chunks} potongan teks.\n\nSilakan ajukan pertanyaan seputar dokumen tersebut.`;
-          
-          setUploadStatus({ 
-            type: "success", 
-            msg: successMsg 
-          });
+          setUploadStatus({ type: "success", msg: successMsg });
         } else {
           setUploadStatus({ type: "error", msg: data.detail || "Upload gagal." });
         }
-      } catch { setUploadStatus({ type: "error", msg: "Server Error." }); } 
-      finally { setIsUploading(false); e.target.value = ''; }
+      } catch {
+        setUploadStatus({ type: "error", msg: "Server Error." });
+      } finally {
+        setIsUploading(false);
+      }
+    };
+
+    // 3. Handler untuk Input File Tradisional
+    const handleFileSelect = (e) => {
+      const file = e.target.files?.[0];
+      processFile(file);
+      e.target.value = ''; // Reset input agar bisa upload file yang sama lagi
+    };
+
+    // 4. Handlers untuk Drag and Drop
+    const handleDrag = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (e.type === "dragover" || e.type === "dragenter") {
+        setIsDragging(true);
+      } else if (e.type === "dragleave") {
+        setIsDragging(false);
+      }
+    };
+
+    const handleDrop = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setIsDragging(false);
+      
+      const file = e.dataTransfer.files?.[0];
+      processFile(file);
     };
 
     const handleDeleteFile = async (filename) => {
@@ -378,14 +414,27 @@
           <div className="section-label">Manajemen Konteks</div>
           
           {isUploading ? (
-            <div className="upload-zone disabled"><div className="upload-spinner-large"></div><div className="upload-text">Mengekstrak Teks...</div></div>
-          ) : (
-            <div className="upload-zone" onClick={() => document.getElementById('fileInput').click()}>
-              <input id="fileInput" type="file" accept=".pdf" onChange={handleUpload} style={{display:'none'}} />
-              <span className="upload-icon">📄</span>
-              <div className="upload-text"><strong>Upload PDF</strong><br/>ke Ruang Sesi</div>
-            </div>
-          )}
+              <div className="upload-zone disabled">
+                <div className="upload-spinner-large"></div>
+                <div className="upload-text">Mengekstrak Teks...</div>
+              </div>
+            ) : (
+              <div 
+                className={`upload-zone ${isDragging ? 'dragging' : ''}`} 
+                onClick={() => document.getElementById('fileInput').click()}
+                onDragEnter={handleDrag}
+                onDragOver={handleDrag}
+                onDragLeave={handleDrag}
+                onDrop={handleDrop}
+              >
+                <input id="fileInput" type="file" accept=".pdf" onChange={handleFileSelect} style={{display:'none'}} />
+                <span className="upload-icon">{isDragging ? '📥' : '📄'}</span>
+                <div className="upload-text">
+                  <strong>{isDragging ? 'Lepas di sini' : 'Upload PDF'}</strong><br/>
+                  {isDragging ? 'Siap diproses' : 'Klik atau Tarik file'}
+                </div>
+              </div>
+            )}
           
           <div className="file-list">
             {files.map(f => (
