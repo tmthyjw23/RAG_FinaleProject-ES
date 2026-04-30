@@ -177,7 +177,11 @@
       try { return JSON.parse(localStorage.getItem("chatMessages")) || []; } catch { return []; }
     });
     const [files, setFiles] = useState(() => {
-      try { return JSON.parse(localStorage.getItem("uploadedFiles")) || []; } catch { return []; }
+      try { 
+        const saved = JSON.parse(localStorage.getItem("uploadedFiles")) || [];
+        // FILTER: Hanya ambil yang benar-benar string dan bukan "null" atau null
+        return saved.filter(f => f && f !== "null" && typeof f === "string");
+      } catch { return []; }
     });
 
     const [isTyping, setIsTyping] = useState(false);
