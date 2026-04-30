@@ -34,7 +34,7 @@ app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 # Konfigurasi G4 Local Service
 SECRET_API_KEY = os.getenv("SECRET_API_KEY", "g4-rahasia")
-OLLAMA_MODEL = "qwen2.5-coder:3b "
+OLLAMA_MODEL = "qwen2.5:0.5b"
 local_client = ollama.Client(host='http://localhost:11434')
 
 # --- SECURITY & ROUTING DEPENDENCY ---
@@ -275,6 +275,10 @@ async def chat(data: ChatRequest, auth_ctx: dict = Depends(get_auth_context)):
         return {"answer": "Silakan masukkan pertanyaan."}
     answer = bot.ask(data.query, data.history, data.language, auth_ctx)
     return {"answer": answer}
+
+@app.get("/validate_local")
+async def validate_local(auth_ctx: dict = Depends(get_auth_context)):
+    return {"status": "success"}
 
 if __name__ == "__main__":
     import uvicorn

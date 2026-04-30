@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>RAG Expert System</title>
+  <title>G4 Expert System</title>
 
   <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -12,99 +12,134 @@
   <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
 
   <style>
-    /* CSS TETAP SAMA SEPERTI SEBELUMNYA */
     * { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
       --glass-bg: rgba(255, 255, 255, 0.7); --glass-border: rgba(0, 0, 0, 0.1);
-      --accent: #7c6af7; --accent2: #a855f7; --accent3: #4c3ba0;
-      --user-bubble: linear-gradient(135deg, #7c6af7, #a855f7);
+      --accent: #111111; --accent2: #333333; --accent3: #555555;
+      --user-bubble: #1a1a2e;
       --bot-bubble: #ffffff; --text-primary: #1a1a2e;
       --text-secondary: #4a4a6a; --text-muted: #7a7a9a;
       --danger: #f43f5e; --success: #10b981;
       --font-main: 'Sora', sans-serif; --font-mono: 'JetBrains Mono', monospace;
-      --bg-main: #F8F8FF;
+      --bg-main: #F4F4F9;
     }
     html, body, #root { height: 100%; width: 100%; }
     body { font-family: var(--font-main); background: var(--bg-main); color: var(--text-primary); overflow: hidden; }
     .app-shell { display: flex; height: 100vh; width: 100%; position: relative; overflow: hidden; }
-    .bg-orb { position: fixed; border-radius: 50%; filter: blur(100px); pointer-events: none; z-index: 0; opacity: 0.5; }
-    .orb1 { width: 500px; height: 500px; background: radial-gradient(circle, rgba(124,106,247,0.15), transparent 70%); top: -100px; left: -100px; }
-    .orb2 { width: 400px; height: 400px; background: radial-gradient(circle, rgba(168,85,247,0.12), transparent 70%); bottom: -50px; right: 30%; }
     
-    .sidebar { width: 300px; min-width: 300px; background: rgba(255, 255, 255, 0.6); backdrop-filter: blur(20px); border-right: 1px solid var(--glass-border); display: flex; flex-direction: column; padding: 24px 20px; gap: 20px; position: relative; z-index: 10; overflow-y: auto; }
-    .app-logo { display: flex; align-items: center; gap: 10px; padding-bottom: 16px; border-bottom: 1px solid rgba(0,0,0,0.05); }
-    .logo-icon { width: 38px; height: 38px; border-radius: 10px; background: linear-gradient(135deg, #7c6af7, #a855f7); display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0; box-shadow: 0 4px 16px rgba(124,106,247,0.3); color: white; }
+    /* Background Orbs for Glassmorphism */
+    .bg-orb { position: fixed; border-radius: 50%; filter: blur(90px); pointer-events: none; z-index: 0; opacity: 0.6; }
+    .orb1 { width: 500px; height: 500px; background: rgba(0,0,0,0.05); top: -100px; left: -100px; }
+    .orb2 { width: 400px; height: 400px; background: rgba(0,0,0,0.03); bottom: -50px; right: 20%; }
+    
+    /* Gatekeeper Modal */
+    .modal-overlay { position: fixed; inset: 0; background: rgba(255, 255, 255, 0.3); backdrop-filter: blur(12px); z-index: 100; display: flex; align-items: center; justify-content: center; }
+    .modal-box { background: rgba(255, 255, 255, 0.85); border: 1px solid rgba(255, 255, 255, 0.6); box-shadow: 0 20px 40px rgba(0,0,0,0.08); border-radius: 24px; width: 420px; padding: 32px; display: flex; flex-direction: column; gap: 20px; animation: scaleUp 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
+    @keyframes scaleUp { from { opacity: 0; transform: scale(0.95) translateY(10px); } to { opacity: 1; transform: scale(1) translateY(0); } }
+    .modal-header { text-align: center; }
+    .modal-header h2 { font-size: 20px; font-weight: 600; margin-bottom: 6px; }
+    .modal-header p { font-size: 12px; color: var(--text-muted); line-height: 1.5; }
+    
+    .mode-toggle { display: flex; background: rgba(0,0,0,0.05); border-radius: 12px; padding: 4px; }
+    .mode-btn { flex: 1; text-align: center; font-size: 12px; padding: 10px; border-radius: 10px; cursor: pointer; color: var(--text-secondary); transition: 0.3s; font-weight: 500; }
+    .mode-btn.active { background: white; color: var(--text-primary); box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+    
+    .api-input { width: 100%; background: white; border: 1px solid rgba(0,0,0,0.1); padding: 14px 16px; border-radius: 12px; font-family: var(--font-mono); font-size: 12px; outline: none; transition: 0.2s; }
+    .api-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(0,0,0,0.05); }
+    
+    .btn-primary { background: var(--accent); color: white; border: none; padding: 14px; border-radius: 12px; font-family: var(--font-main); font-weight: 600; font-size: 13px; cursor: pointer; transition: 0.2s; display: flex; align-items: center; justify-content: center; gap: 8px; }
+    .btn-primary:hover { opacity: 0.9; transform: translateY(-1px); }
+    .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
+
+    /* Layout & Sidebar */
+    .sidebar { width: 300px; min-width: 300px; background: rgba(255, 255, 255, 0.6); backdrop-filter: blur(20px); border-right: 1px solid var(--glass-border); display: flex; flex-direction: column; padding: 24px 20px; position: relative; z-index: 10; overflow-y: auto; }
+    .app-logo { display: flex; align-items: center; gap: 12px; margin-bottom: 24px; }
+    .logo-icon { width: 40px; height: 40px; border-radius: 12px; background: var(--accent); display: flex; align-items: center; justify-content: center; font-size: 18px; color: white; box-shadow: 0 4px 16px rgba(0,0,0,0.15); }
     .logo-text { font-size: 15px; font-weight: 600; }
-    .logo-sub { font-size: 11px; color: var(--text-muted); font-weight: 300; }
-    .section-label { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 1.5px; color: var(--text-muted); margin-bottom: 8px; }
+    .logo-sub { font-size: 11px; color: var(--text-muted); }
     
-    .mode-toggle { display: flex; background: rgba(0,0,0,0.05); border-radius: 8px; padding: 4px; margin-bottom: 12px; }
-    .mode-btn { flex: 1; text-align: center; font-size: 11px; padding: 6px; border-radius: 6px; cursor: pointer; color: var(--text-secondary); transition: 0.3s; }
-    .mode-btn.active { background: white; color: var(--accent); font-weight: 600; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+    .section-label { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 1.5px; color: var(--text-muted); margin-bottom: 12px; margin-top: 24px; }
     
-    .upload-zone { border: 1.5px dashed rgba(124,106,247,0.3); border-radius: 14px; padding: 20px 16px; text-align: center; cursor: pointer; transition: all 0.25s ease; background: rgba(124,106,247,0.03); position: relative; overflow: hidden; }
-    .upload-zone:hover:not(.disabled) { border-color: var(--accent); background: rgba(124,106,247,0.08); }
+    .service-badge { display: flex; align-items: center; justify-content: space-between; background: white; padding: 12px; border-radius: 12px; border: 1px solid rgba(0,0,0,0.05); margin-bottom: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.02); }
+    .service-info { display: flex; flex-direction: column; gap: 4px; }
+    .service-title { font-size: 12px; font-weight: 600; }
+    .service-status { font-size: 10px; color: var(--success); display: flex; align-items: center; gap: 4px; }
+    .service-status::before { content: ''; width: 6px; height: 6px; background: var(--success); border-radius: 50%; }
+    .btn-switch { background: rgba(0,0,0,0.05); border: none; padding: 6px 10px; border-radius: 8px; font-size: 10px; font-weight: 600; cursor: pointer; transition: 0.2s; font-family: var(--font-main); }
+    .btn-switch:hover { background: rgba(0,0,0,0.1); }
+
+    .upload-zone { border: 1.5px dashed rgba(0,0,0,0.2); border-radius: 14px; padding: 20px 16px; text-align: center; cursor: pointer; transition: all 0.25s ease; background: rgba(255,255,255,0.4); position: relative; overflow: hidden; }
+    .upload-zone:hover:not(.disabled) { border-color: var(--accent); background: white; }
     .upload-zone.disabled { cursor: default; opacity: 0.8; }
     .upload-zone input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
-    .upload-icon { font-size: 28px; margin-bottom: 8px; display: block; }
-    .upload-text { font-size: 12px; line-height: 1.5; }
+    .upload-icon { font-size: 24px; margin-bottom: 8px; display: block; }
+    .upload-text { font-size: 12px; color: var(--text-secondary); line-height: 1.5; }
     
-    .file-list { margin-top: 10px; display: flex; flex-direction: column; gap: 8px; }
-    .file-badge { display: flex; align-items: center; justify-content: space-between; background: rgba(124,106,247,0.08); border: 1px solid rgba(124,106,247,0.15); border-radius: 8px; padding: 8px 10px; font-size: 11px; color: var(--accent3); font-family: var(--font-mono); }
-    .del-btn { cursor: pointer; color: var(--danger); font-size: 14px; background: none; border: none; padding: 0 4px; opacity: 0.6; transition: 0.2s; }
+    .file-list { margin-top: 12px; display: flex; flex-direction: column; gap: 8px; }
+    .file-badge { display: flex; align-items: center; justify-content: space-between; background: white; border: 1px solid rgba(0,0,0,0.05); border-radius: 10px; padding: 10px 12px; font-size: 11px; color: var(--text-primary); font-family: var(--font-mono); box-shadow: 0 2px 4px rgba(0,0,0,0.02); }
+    .del-btn { cursor: pointer; color: var(--danger); font-size: 16px; background: none; border: none; padding: 0 4px; opacity: 0.6; transition: 0.2s; display: flex; align-items: center; justify-content: center; height: 100%; }
     .del-btn:hover { opacity: 1; transform: scale(1.1); }
+
+    .status-msg { font-size: 11px; border-radius: 10px; padding: 10px 12px; display: flex; align-items: center; gap: 6px; margin-top: 12px; font-weight: 500; }
+    .status-msg.success { background: rgba(16,185,129,0.1); color: #059669; }
+    .status-msg.error { background: rgba(244,63,94,0.1); color: #e11d48; }
+
+    .sidebar-spacer { flex: 1; }
     
-    .status-msg { font-size: 11px; border-radius: 8px; padding: 8px 10px; display: flex; align-items: center; gap: 6px; margin-top: 8px; }
-    .status-msg.success { background: rgba(16,185,129,0.08); color: #059669; border: 1px solid rgba(16,185,129,0.15); }
-    .status-msg.error { background: rgba(244,63,94,0.08); color: #e11d48; border: 1px solid rgba(244,63,94,0.15); }
-    .divider { padding: 16px 0; border-top: 1px solid rgba(0,0,0,0.05); }
-    .api-input { width: 100%; background: white; border: 1px solid rgba(0,0,0,0.1); padding: 8px 10px; border-radius: 8px; font-family: var(--font-main); font-size: 11px; outline: none; }
-    .api-input:focus { border-color: var(--accent); }
-    
+    .btn-clear { width: 100%; background: transparent; border: 1px solid rgba(244,63,94,0.3); color: var(--danger); padding: 12px; border-radius: 12px; font-size: 12px; font-weight: 600; cursor: pointer; transition: 0.2s; font-family: var(--font-main); display: flex; justify-content: center; align-items: center; gap: 8px; margin-bottom: 16px; }
+    .btn-clear:hover { background: rgba(244,63,94,0.05); border-color: var(--danger); }
+
+    .sidebar-footer { font-size: 10px; color: var(--text-muted); text-align: center; }
+
+    /* Main Chat Content */
     .main-content { flex: 1; display: flex; flex-direction: column; position: relative; z-index: 5; background: transparent; }
-    .chat-header { padding: 16px 28px; background: rgba(255, 255, 255, 0.6); backdrop-filter: blur(16px); border-bottom: 1px solid var(--glass-border); display: flex; align-items: center; gap: 12px; }
-    .chat-header-avatar { width: 36px; height: 36px; border-radius: 50%; background: linear-gradient(135deg, #7c6af7, #a855f7); display: flex; align-items: center; justify-content: center; font-size: 16px; color: white; }
-    .chat-header-info .title { font-size: 14px; font-weight: 600; }
-    .chat-header-info .sub { font-size: 11px; color: var(--text-muted); }
+    .chat-header { padding: 20px 32px; background: rgba(255, 255, 255, 0.4); backdrop-filter: blur(16px); border-bottom: 1px solid var(--glass-border); display: flex; align-items: center; gap: 12px; }
+    .chat-header-avatar { width: 40px; height: 40px; border-radius: 12px; background: white; border: 1px solid rgba(0,0,0,0.05); display: flex; align-items: center; justify-content: center; font-size: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.03); }
+    .chat-header-info .title { font-size: 15px; font-weight: 600; }
+    .chat-header-info .sub { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
     
-    .chat-window { flex: 1; overflow-y: auto; padding: 20px 28px; display: flex; flex-direction: column; gap: 16px; }
-    .chat-window::-webkit-scrollbar { width: 8px; }
-    .chat-window::-webkit-scrollbar-thumb { background: rgba(124,106,247,0.15); border-radius: 4px; }
+    .msg-count-badge { margin-left: auto; background: white; padding: 6px 12px; border-radius: 20px; font-size: 11px; font-weight: 600; color: var(--text-secondary); border: 1px solid rgba(0,0,0,0.05); }
+
+    .chat-window { flex: 1; overflow-y: auto; padding: 24px 32px; display: flex; flex-direction: column; gap: 20px; }
+    .chat-window::-webkit-scrollbar { width: 6px; }
+    .chat-window::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.1); border-radius: 10px; }
     
-    .empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; margin: auto; text-align: center; gap: 12px;}
-    .empty-icon { font-size: 48px; }
-    .empty-title { font-size: 18px; font-weight: 600; }
-    .empty-sub { font-size: 12px; color: var(--text-muted); max-width: 250px; }
+    .empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; margin: auto; text-align: center; gap: 16px;}
+    .empty-icon { font-size: 56px; opacity: 0.8; }
+    .empty-title { font-size: 20px; font-weight: 600; color: var(--text-primary); }
+    .empty-sub { font-size: 13px; color: var(--text-secondary); max-width: 300px; line-height: 1.6; }
     
-    .bubble-row { display: flex; gap: 12px; align-items: flex-end; animation: slideIn 0.3s ease forwards; }
+    .bubble-row { display: flex; gap: 16px; align-items: flex-end; animation: slideIn 0.3s ease forwards; }
     @keyframes slideIn { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
     .bubble-row.user { justify-content: flex-end; }
     .bubble-row.bot { justify-content: flex-start; }
-    .bubble-avatar { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 14px; flex-shrink: 0; }
-    .bubble-avatar.user-av { background: linear-gradient(135deg, #7c6af7, #a855f7); color: white; }
-    .bubble-avatar.bot-av { background: white; border: 1px solid rgba(0,0,0,0.05); }
-    .bubble-content { display: flex; flex-direction: column; gap: 4px; max-width: 500px; }
-    .bubble-meta { font-size: 10px; color: var(--text-muted); padding: 0 12px; }
-    .bubble { padding: 10px 14px; border-radius: 12px; font-size: 13px; line-height: 1.5; box-shadow: 0 2px 8px rgba(0,0,0,0.04); }
+    .bubble-avatar { width: 36px; height: 36px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; }
+    .bubble-avatar.user-av { background: var(--accent); color: white; }
+    .bubble-avatar.bot-av { background: white; border: 1px solid rgba(0,0,0,0.05); box-shadow: 0 4px 12px rgba(0,0,0,0.03); }
+    .bubble-content { display: flex; flex-direction: column; gap: 6px; max-width: 600px; }
+    .bubble-meta { font-size: 11px; color: var(--text-muted); padding: 0 4px; display: flex; justify-content: space-between; }
+    .bubble { padding: 14px 18px; font-size: 14px; line-height: 1.6; box-shadow: 0 4px 16px rgba(0,0,0,0.04); }
     .bubble.user { background: var(--user-bubble); color: #fff; border-radius: 16px 16px 4px 16px; }
     .bubble.bot { background: var(--bot-bubble); color: var(--text-primary); border: 1px solid rgba(0,0,0,0.05); border-radius: 16px 16px 16px 4px; }
     
-    .typing-indicator { display: flex; align-items: center; gap: 4px; height: 20px; }
-    .typing-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--text-muted); animation: typingBounce 1.4s infinite; }
+    .typing-indicator { display: flex; align-items: center; gap: 6px; height: 24px; padding: 0 8px; }
+    .typing-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); animation: typingBounce 1.4s infinite; opacity: 0.5; }
     .typing-dot:nth-child(2) { animation-delay: 0.2s; }
     .typing-dot:nth-child(3) { animation-delay: 0.4s; }
-    @keyframes typingBounce { 0%, 60%, 100% { opacity: 0.4; transform: translateY(0); } 30% { opacity: 1; transform: translateY(-10px); } }
+    @keyframes typingBounce { 0%, 60%, 100% { transform: translateY(0); opacity: 0.5; } 30% { transform: translateY(-6px); opacity: 1; } }
     
-    .chat-input-bar { padding: 16px 28px 20px; background: rgba(255, 255, 255, 0.7); backdrop-filter: blur(16px); border-top: 1px solid var(--glass-border); display: flex; flex-direction: column; gap: 8px; }
-    .input-wrapper { display: flex; gap: 12px; align-items: flex-end; }
-    .lang-select { background: white; border: 1px solid rgba(0,0,0,0.1); padding: 0 10px; border-radius: 10px; font-size: 12px; height: 40px; cursor: pointer; outline: none; }
-    .chat-input { flex: 1; background: white; border: 1px solid rgba(0,0,0,0.1); padding: 10px 14px; border-radius: 10px; font-size: 13px; resize: none; min-height: 40px; max-height: 120px; outline: none; font-family: var(--font-main); }
-    .send-btn { width: 36px; height: 36px; background: linear-gradient(135deg, #7c6af7, #a855f7); border: none; border-radius: 10px; color: #fff; font-size: 16px; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: 0.2s;}
+    .chat-input-bar { padding: 20px 32px 24px; background: rgba(255, 255, 255, 0.4); backdrop-filter: blur(16px); border-top: 1px solid var(--glass-border); display: flex; flex-direction: column; gap: 10px; }
+    .input-wrapper { display: flex; gap: 12px; align-items: flex-end; background: white; padding: 8px; border-radius: 16px; border: 1px solid rgba(0,0,0,0.08); box-shadow: 0 4px 20px rgba(0,0,0,0.02); transition: 0.2s; }
+    .input-wrapper:focus-within { border-color: var(--accent); box-shadow: 0 4px 20px rgba(0,0,0,0.06); }
+    .lang-select { background: rgba(0,0,0,0.03); border: none; padding: 0 12px; border-radius: 10px; font-size: 12px; font-weight: 600; height: 44px; cursor: pointer; outline: none; font-family: var(--font-main); color: var(--text-secondary); }
+    .chat-input { flex: 1; background: transparent; border: none; padding: 12px 8px; font-size: 14px; resize: none; min-height: 44px; max-height: 150px; outline: none; font-family: var(--font-main); color: var(--text-primary); line-height: 1.5; }
+    .chat-input::placeholder { color: var(--text-muted); }
+    .send-btn { width: 44px; height: 44px; background: var(--accent); border: none; border-radius: 12px; color: #fff; font-size: 16px; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: 0.2s; }
     .send-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-    .upload-spinner-large { display: inline-block; width: 32px; height: 32px; border: 3px solid rgba(124,106,247,0.2); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; margin-bottom: 8px; }
-    .spinner { display: inline-block; width: 12px; height: 12px; border: 2px solid rgba(255,255,255,0.3); border-top-color: #fff; border-radius: 50%; animation: spin 0.8s linear infinite; }
+    
+    .upload-spinner-large { display: inline-block; width: 32px; height: 32px; border: 3px solid rgba(0,0,0,0.1); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; margin-bottom: 12px; }
+    .spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid rgba(255,255,255,0.3); border-top-color: #fff; border-radius: 50%; animation: spin 0.8s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
-    .input-hint { text-align: center; font-size: 10px; color: var(--text-muted); margin-top: 8px; }
   </style>
 </head>
 <body>
@@ -114,23 +149,27 @@
   const { useState, useEffect, useRef } = React;
   const API_BASE = "";
 
-  // Helper untuk membuat Session ID Unik
   const generateSessionId = () => 'sess_' + Math.random().toString(36).substr(2, 9);
 
   function App() {
+    // State Authentication & Setup
+    const [hasEntered, setHasEntered] = useState(false);
+    const [isValidating, setIsValidating] = useState(false);
+    const [tempMode, setTempMode] = useState("local");
+    const [tempKey, setTempKey] = useState("");
+    const [authError, setAuthError] = useState("");
+
     const [sessionId] = useState(() => {
       let sid = localStorage.getItem("ragSessionId");
       if (!sid) { sid = generateSessionId(); localStorage.setItem("ragSessionId", sid); }
       return sid;
     });
 
-    const [mode, setMode] = useState("local"); // "local" atau "cloud"
+    const [mode, setMode] = useState("local"); 
     const [apiKey, setApiKey] = useState(() => sessionStorage.getItem("customApiKey") || "");
     const [messages, setMessages] = useState(() => {
       try { return JSON.parse(localStorage.getItem("chatMessages")) || []; } catch { return []; }
     });
-    
-    // Mengubah fileName menjadi array untuk mendukung multi-file (opsional) atau manajemen list
     const [files, setFiles] = useState(() => {
       try { return JSON.parse(localStorage.getItem("uploadedFiles")) || []; } catch { return []; }
     });
@@ -151,60 +190,105 @@
     useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, isTyping]);
 
     const getHeaders = (isJson = false) => {
-      const headers = { 
-        "X-Service-Mode": mode,
-        "X-Session-ID": sessionId
-      };
+      const headers = { "X-Service-Mode": mode, "X-Session-ID": sessionId };
       if (isJson) headers["Content-Type"] = "application/json";
       if (apiKey) headers["Authorization"] = `Bearer ${apiKey}`;
       return headers;
+    };
+
+    // --- GATEKEEPER LOGIC ---
+    const handleEntry = async () => {
+      if (!tempKey.trim()) {
+        setAuthError(tempMode === "local" ? "Password tidak boleh kosong." : "API Key tidak boleh kosong.");
+        return;
+      }
+
+      setIsValidating(true);
+      setAuthError("");
+
+      if (tempMode === "cloud") {
+        // Client-side Validation untuk Google Gemini (Zero Server Load)
+        try {
+          // Melakukan HTTP GET ke endpoint API resmi Google untuk mengecek eksistensi model dan validitas kunci
+          const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash?key=${tempKey.trim()}`);
+          if (res.ok) {
+            setApiKey(tempKey.trim());
+            setMode("cloud");
+            setHasEntered(true);
+          } else {
+            setAuthError("API Key tidak valid atau terblokir.");
+          }
+        } catch (e) {
+          setAuthError("Gagal menghubungi server Google.");
+        }
+      } else {
+        // Backend Validation untuk Password Lokal
+        try {
+          const res = await fetch(`${API_BASE}/validate_local`, {
+            headers: { "X-Service-Mode": "local", "X-Session-ID": sessionId, "Authorization": `Bearer ${tempKey.trim()}` }
+          });
+          if (res.ok) {
+            setApiKey(tempKey.trim());
+            setMode("local");
+            setHasEntered(true);
+          } else {
+            setAuthError("Password G4 Local salah.");
+          }
+        } catch (e) {
+          setAuthError("Server lokal tidak merespons.");
+        }
+      }
+      setIsValidating(false);
+    };
+
+    const handleChangeService = () => {
+      if (window.confirm("Mengganti layanan akan mereset ingatan chat saat ini. Lanjutkan?")) {
+        setMessages([]); // Reset memory to prevent context hallucination
+        setTempKey("");  // Reset form
+        setAuthError("");
+        setHasEntered(false); // Munculkan modal gatekeeper kembali
+      }
+    };
+
+    // --- MAIN APP LOGIC ---
+    const handleClearChat = () => {
+      if (messages.length === 0) return;
+      if (window.confirm("Bersihkan layar chat? Ingatan AI tentang obrolan ini akan dihapus.")) {
+        setMessages([]);
+      }
     };
 
     const handleUpload = async (e) => {
       const file = e.target.files?.[0];
       if (!file) return;
       if (file.type !== "application/pdf") {
-        setUploadStatus({ type: "error", msg: "Hanya file PDF yang diterima." });
+        setUploadStatus({ type: "error", msg: "Hanya PDF yang diterima." });
         return;
       }
-      
-      setIsUploading(true);
-      setUploadStatus(null);
-      
-      const formData = new FormData();
-      formData.append("file", file);
+      setIsUploading(true); setUploadStatus(null);
+      const formData = new FormData(); formData.append("file", file);
 
       try {
         const res = await fetch(`${API_BASE}/upload`, { method: "POST", headers: getHeaders(false), body: formData });
         const data = await res.json();
-        
         if (res.ok) {
           if (!files.includes(data.filename)) setFiles([...files, data.filename]);
-          setUploadStatus({ type: "success", msg: "File berhasil diindeks!" });
+          setUploadStatus({ type: "success", msg: "File berhasil diindeks." });
         } else {
-          setUploadStatus({ type: "error", msg: data.detail || data.message || "Upload gagal." });
+          setUploadStatus({ type: "error", msg: data.detail || "Upload gagal." });
         }
-      } catch {
-        setUploadStatus({ type: "error", msg: "Gagal menghubungi server." });
-      } finally {
-        setIsUploading(false);
-      }
+      } catch { setUploadStatus({ type: "error", msg: "Server Error." }); } 
+      finally { setIsUploading(false); e.target.value = ''; }
     };
 
     const handleDeleteFile = async (filename) => {
       try {
-        const res = await fetch(`${API_BASE}/delete_file`, { 
-          method: "POST", 
-          headers: getHeaders(true), 
-          body: JSON.stringify({ filename }) 
-        });
+        const res = await fetch(`${API_BASE}/delete_file`, { method: "POST", headers: getHeaders(true), body: JSON.stringify({ filename }) });
         if (res.ok) {
           setFiles(files.filter(f => f !== filename));
-          setUploadStatus({ type: "success", msg: `File ${filename} dihapus.` });
+          setUploadStatus({ type: "success", msg: `File dihapus.` });
         }
-      } catch {
-        setUploadStatus({ type: "error", msg: "Gagal menghapus file." });
-      }
+      } catch { setUploadStatus({ type: "error", msg: "Gagal menghapus file." }); }
     };
 
     const handleSend = async () => {
@@ -216,147 +300,156 @@
       setInput("");
       setIsTyping(true);
 
-      // Kirim history percakapan ke backend
       const history = messages.map(m => ({ role: m.role, text: m.text }));
 
       try {
         const res = await fetch(`${API_BASE}/chat`, {
-          method: "POST",
-          headers: getHeaders(true),
-          body: JSON.stringify({ query, language, history }),
+          method: "POST", headers: getHeaders(true), body: JSON.stringify({ query, language, history }),
         });
-
         if (res.status === 401) {
-          setMessages(prev => [...prev, { id: Date.now(), role: "bot", text: "⚠️ Akses ditolak. Cek Password/API Key Anda.", time: "Sekarang" }]);
-          setIsTyping(false);
-          return;
+          setMessages(prev => [...prev, { id: Date.now(), role: "bot", text: "⚠️ Akses Ditolak. Sesi tidak valid.", time: "System" }]);
+          setIsTyping(false); return;
         }
-
         const data = await res.json();
         setMessages(prev => [...prev, { id: Date.now(), role: "bot", text: data.answer, time: new Date().toLocaleTimeString("id-ID", {hour:"2-digit", minute:"2-digit"}) }]);
       } catch {
-        setMessages(prev => [...prev, { id: Date.now(), role: "bot", text: "⚠️ Gagal terhubung ke server.", time: "Sekarang" }]);
-      } finally {
-        setIsTyping(false);
-      }
-    };
-
-    const handleClearChat = () => {
-      if (window.confirm("Apakah Anda yakin ingin membersihkan layar chat? Ingatan obrolan ini akan dihapus.")) {
-        setMessages([]);
-        localStorage.removeItem("chatMessages");
-      }
+        setMessages(prev => [...prev, { id: Date.now(), role: "bot", text: "⚠️ Gagal terhubung ke AI Gateway.", time: "System" }]);
+      } finally { setIsTyping(false); }
     };
 
     return (
       <div className="app-shell">
-        <div className="bg-orb orb1" /> <div className="bg-orb orb2" /> <div className="bg-orb orb3" />
+        <div className="bg-orb orb1" /> <div className="bg-orb orb2" />
         
+        {/* GATEKEEPER MODAL */}
+        {!hasEntered && (
+          <div className="modal-overlay">
+            <div className="modal-box">
+              <div className="modal-header">
+                <h2>Selamat Datang di G4</h2>
+                <p>Pilih mode komputasi untuk sesi dokumen Anda.</p>
+              </div>
+              
+              <div className="mode-toggle">
+                <div className={`mode-btn ${tempMode === 'local' ? 'active' : ''}`} onClick={() => {setTempMode('local'); setAuthError("");}}>🖥️ Server Lokal</div>
+                <div className={`mode-btn ${tempMode === 'cloud' ? 'active' : ''}`} onClick={() => {setTempMode('cloud'); setAuthError("");}}>☁️ API Pribadi</div>
+              </div>
+
+              <div>
+                <input 
+                  type={tempMode === 'local' ? "password" : "text"} 
+                  className="api-input" 
+                  placeholder={tempMode === 'local' ? "Masukkan Master Password..." : "Paste API Key Gemini di sini..."}
+                  value={tempKey} onChange={(e) => setTempKey(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') handleEntry(); }}
+                />
+                {authError && <div style={{color: 'var(--danger)', fontSize: '11px', marginTop: '8px', textAlign: 'center'}}>{authError}</div>}
+              </div>
+
+              <button className="btn-primary" onClick={handleEntry} disabled={isValidating}>
+                {isValidating ? <span className="spinner"></span> : (tempMode === 'local' ? "Buka Akses" : "Validasi & Masuk")}
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* SIDEBAR */}
         <div className="sidebar">
           <div className="app-logo">
             <div className="logo-icon">G4</div>
-            <div><div className="logo-text">G4 Expert System</div><div className="logo-sub">Multi-tenant RAG</div></div>
+            <div><div className="logo-text">Expert System</div><div className="logo-sub">Multi-Tenant Vault</div></div>
           </div>
 
-          <div className="divider" style={{paddingTop: 0}}>
-            <div className="section-label">Mode Layanan</div>
-            <div className="mode-toggle">
-              <div className={`mode-btn ${mode === 'local' ? 'active' : ''}`} onClick={() => setMode('local')}>🖥️ G4 Local</div>
-              <div className={`mode-btn ${mode === 'cloud' ? 'active' : ''}`} onClick={() => setMode('cloud')}>☁️ BYO Key</div>
+          <div className="service-badge">
+            <div className="service-info">
+              <div className="service-title">{mode === 'local' ? 'Ollama Engine' : 'Google Gemini'}</div>
+              <div className="service-status">Status: Terhubung</div>
             </div>
-            <div className="api-input-wrapper">
-              <input 
-                type="password" className="api-input" 
-                placeholder={mode === 'local' ? "Masukkan Password Local..." : "Masukkan API Key GenAI..."}
-                value={apiKey} onChange={(e) => setApiKey(e.target.value)} 
-              />
-            </div>
+            <button className="btn-switch" onClick={handleChangeService}>GANTI</button>
           </div>
 
-          <div>
-            <div className="section-label">Manajemen Dokumen Sesi Ini</div>
-            {isUploading ? (
-              <div className="upload-zone disabled"><div className="upload-spinner-large"></div><div className="upload-text">Memproses...</div></div>
-            ) : (
-              <div className="upload-zone" onClick={() => document.getElementById('fileInput').click()}>
-                <input id="fileInput" type="file" accept=".pdf" onChange={handleUpload} style={{display:'none'}} />
-                <span className="upload-icon">📄</span>
-                <div className="upload-text"><strong>Upload PDF</strong> untuk sesi Anda</div>
-              </div>
-            )}
-            
-            <div className="file-list">
-              {files.map(f => (
-                <div key={f} className="file-badge">
-                  <span style={{overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>{f}</span>
-                  <button className="del-btn" onClick={() => handleDeleteFile(f)} title="Hapus file ini">×</button>
-                </div>
-              ))}
+          <div className="section-label">Manajemen Konteks</div>
+          
+          {isUploading ? (
+            <div className="upload-zone disabled"><div className="upload-spinner-large"></div><div className="upload-text">Mengekstrak Teks...</div></div>
+          ) : (
+            <div className="upload-zone" onClick={() => document.getElementById('fileInput').click()}>
+              <input id="fileInput" type="file" accept=".pdf" onChange={handleUpload} style={{display:'none'}} />
+              <span className="upload-icon">📄</span>
+              <div className="upload-text"><strong>Upload PDF</strong><br/>ke Ruang Sesi</div>
             </div>
-            
-            {uploadStatus && (
-              <div className={`status-msg ${uploadStatus.type}`}>
-                {uploadStatus.type === "success" ? "✓" : "✕"} {uploadStatus.msg}
+          )}
+          
+          <div className="file-list">
+            {files.map(f => (
+              <div key={f} className="file-badge">
+                <span style={{overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', maxWidth:'180px'}}>{f}</span>
+                <button className="del-btn" onClick={() => handleDeleteFile(f)} title="Hapus">×</button>
               </div>
-            )}
+            ))}
           </div>
           
-          <div className="sidebar-footer">
-            🚀 <span>G4 Chatbot v2.0</span><br />
-            <code>Session: {sessionId.substring(0,8)}...</code>
-          </div>
-          <div style={{ marginLeft: "10px",marginTop: "90%", display: "flex", gap: "8px", alignItems: "center" }}>
-              {messages.length > 0 && (
-                <button 
-                  onClick={handleClearChat}
-                  style={{
-                    background: "rgba(244,63,94,0.1)", border: "1px solid rgba(244,63,94,0.3)", color: "var(--danger)",
-                    padding: "4px 8px", borderRadius: "6px", fontSize: "13px", cursor: "pointer", transition: "0.2s"
-                  }}
-                  onMouseOver={(e) => e.target.style.background = "rgba(244,63,94,0.2)"}
-                  onMouseOut={(e) => e.target.style.background = "rgba(244,63,94,0.1)"}
-                  title="Bersihkan layar dan lupakan konteks obrolan"
-                >
-                  🧹 Bersihkan
-                </button>
-              )}
+          {uploadStatus && (
+            <div className={`status-msg ${uploadStatus.type}`}>
+              {uploadStatus.msg}
             </div>
+          )}
+          
+          <div className="sidebar-spacer"></div>
+
+          {messages.length > 0 && (
+            <button className="btn-clear" onClick={handleClearChat}>
+              🧹 Bersihkan Memori Obrolan
+            </button>
+          )}
+
+          <div className="sidebar-footer">
+            Sesi ID: <code>{sessionId.substring(0,8)}</code>
+          </div>
         </div>
 
-        {/* MAIN CHAT */}
+        {/* MAIN CONTENT AREA */}
         <div className="main-content">
           <div className="chat-header">
-            <div className="chat-header-avatar">🤖<div className="status-dot" /></div>
+            <div className="chat-header-avatar">🤖</div>
             <div className="chat-header-info">
-              <div className="title">AI Assistant ({mode === 'local' ? 'Ollama' : 'Cloud'})</div>
-              <div className="sub">Konteks & Memori diamankan per-sesi</div>
+              <div className="title">AI Data Analyst</div>
+              <div className="sub">Respons ketat berdasarkan dokumen yang diunggah.</div>
             </div>
-            
-            <div style={{ marginLeft: "auto" }} className="msg-count-badge">{messages.length} pesan</div>
+            <div className="msg-count-badge">{messages.length} Interaksi</div>
           </div>
 
           <div className="chat-window">
             {messages.length === 0 && !isTyping && (
               <div className="empty-state">
                 <div className="empty-icon">💬</div>
-                <div className="empty-title">Siap Membantu</div>
-                <div className="empty-sub">Upload dokumen dan mulai berdiskusi. Dokumen Anda terisolasi dengan aman di sesi ini.</div>
+                <div className="empty-title">Ruang Diskusi Kosong</div>
+                <div className="empty-sub">Mulai dengan mengunggah dokumen PDF di menu samping, lalu ajukan pertanyaan Anda.</div>
               </div>
             )}
+            
             {messages.map((msg) => (
               <div key={msg.id} className={`bubble-row ${msg.role}`}>
-                <div className={`bubble-avatar ${msg.role === 'user' ? 'user-av' : 'bot-av'}`}>{msg.role === 'user' ? '👤' : '🤖'}</div>
+                <div className={`bubble-avatar ${msg.role === 'user' ? 'user-av' : 'bot-av'}`}>{msg.role === 'user' ? 'G4' : 'AI'}</div>
                 <div className="bubble-content">
-                  <div className="bubble-meta">{msg.role === 'user' ? 'Kamu' : 'AI'} · {msg.time}</div>
+                  <div className="bubble-meta">
+                    <span>{msg.role === 'user' ? 'Anda' : 'Expert System'}</span>
+                    <span>{msg.time}</span>
+                  </div>
                   <div className={`bubble ${msg.role}`} style={{whiteSpace: 'pre-wrap'}}>{msg.text}</div>
                 </div>
               </div>
             ))}
+            
             {isTyping && (
               <div className="bubble-row bot">
-                <div className="bubble-avatar bot-av">🤖</div>
-                <div className="bubble-content"><div className="typing-indicator"><div className="typing-dot"/><div className="typing-dot"/><div className="typing-dot"/></div></div>
+                <div className="bubble-avatar bot-av">AI</div>
+                <div className="bubble-content">
+                  <div className="bubble-meta">Sedang berpikir...</div>
+                  <div className="bubble bot">
+                    <div className="typing-indicator"><div className="typing-dot"/><div className="typing-dot"/><div className="typing-dot"/></div>
+                  </div>
+                </div>
               </div>
             )}
             <div ref={chatEndRef} />
@@ -368,16 +461,15 @@
                 <option value="English">EN</option><option value="Indonesia">ID</option><option value="Mandarin">CN</option>
               </select>
               <textarea
-                ref={textareaRef} className="chat-input" placeholder="Tanyakan sesuatu..."
+                ref={textareaRef} className="chat-input" placeholder="Tanyakan spesifik terkait dokumen..."
                 value={input} onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
-                disabled={isTyping} rows={1}
+                disabled={isTyping || !hasEntered} rows={1}
               />
-              <button className="send-btn" onClick={handleSend} disabled={!input.trim() || isTyping}>
+              <button className="send-btn" onClick={handleSend} disabled={!input.trim() || isTyping || !hasEntered}>
                 {isTyping ? <span className="spinner" /> : <span>➤</span>}
               </button>
             </div>
-            <div className="input-hint">Enter untuk kirim · Shift+Enter untuk baris baru</div>
           </div>
         </div>
       </div>
