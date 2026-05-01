@@ -70,12 +70,7 @@
 
     .upload-zone { border: 1.5px dashed rgba(0,0,0,0.2); border-radius: 14px; padding: 20px 16px; text-align: center; cursor: pointer; transition: all 0.25s ease; background: rgba(255,255,255,0.4); position: relative; overflow: hidden; }
     .upload-zone:hover:not(.disabled) { border-color: var(--accent); background: white; }
-    .upload-zone.dragging {
-      border-color: var(--accent);
-      background: rgba(0, 0, 0, 0.05);
-      transform: scale(1.02);
-      box-shadow: 0 8px 24px rgba(0,0,0,0.05);
-    }
+    .upload-zone.dragging { border-color: var(--accent); background: rgba(0, 0, 0, 0.05); transform: scale(1.02); box-shadow: 0 8px 24px rgba(0,0,0,0.05); }
     .upload-zone.disabled { cursor: default; opacity: 0.8; }
     .upload-zone input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
     .upload-icon { font-size: 24px; margin-bottom: 8px; display: block; }
@@ -158,7 +153,6 @@
   const generateSessionId = () => 'sess_' + Math.random().toString(36).substr(2, 9);
 
   function App() {
-    // State Authentication & Setup
     const [hasEntered, setHasEntered] = useState(false);
     const [isValidating, setIsValidating] = useState(false);
     const [tempMode, setTempMode] = useState("local");
@@ -176,10 +170,11 @@
     const [messages, setMessages] = useState(() => {
       try { return JSON.parse(localStorage.getItem("chatMessages")) || []; } catch { return []; }
     });
+    
     const [files, setFiles] = useState(() => {
       try { 
         const saved = JSON.parse(localStorage.getItem("uploadedFiles")) || [];
-        // FILTER: Hanya ambil yang benar-benar string dan bukan "null" atau null
+        // FILTER: Mengabaikan data "null" dan null dari histori localStorage
         return saved.filter(f => f && f !== "null" && typeof f === "string");
       } catch { return []; }
     });
@@ -189,11 +184,11 @@
     const [uploadStatus, setUploadStatus] = useState(null);
     const [language, setLanguage] = useState("English");
     const [input, setInput] = useState("");
+    const [isDragging, setIsDragging] = useState(false);
 
     const chatEndRef = useRef(null);
     const textareaRef = useRef(null);
 
-    // Persistence
     useEffect(() => { localStorage.setItem("chatMessages", JSON.stringify(messages)); }, [messages]);
     useEffect(() => { localStorage.setItem("uploadedFiles", JSON.stringify(files)); }, [files]);
     useEffect(() => { sessionStorage.setItem("customApiKey", apiKey); }, [apiKey]);
@@ -206,20 +201,16 @@
       return headers;
     };
 
-    // --- GATEKEEPER LOGIC ---
     const handleEntry = async () => {
       if (!tempKey.trim()) {
         setAuthError(tempMode === "local" ? "Password tidak boleh kosong." : "API Key tidak boleh kosong.");
         return;
       }
-
       setIsValidating(true);
       setAuthError("");
 
       if (tempMode === "cloud") {
-        // Client-side Validation untuk Google Gemini (Zero Server Load)
         try {
-          // Melakukan HTTP GET ke endpoint API resmi Google untuk mengecek eksistensi model dan validitas kunci
           const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash?key=${tempKey.trim()}`);
           if (res.ok) {
             setApiKey(tempKey.trim());
@@ -232,7 +223,6 @@
           setAuthError("Gagal menghubungi server Google.");
         }
       } else {
-        // Backend Validation untuk Password Lokal
         try {
           const res = await fetch(`${API_BASE}/validate_local`, {
             headers: { "X-Service-Mode": "local", "X-Session-ID": sessionId, "Authorization": `Bearer ${tempKey.trim()}` }
@@ -253,14 +243,13 @@
 
     const handleChangeService = () => {
       if (window.confirm("Mengganti layanan akan mereset ingatan chat saat ini. Lanjutkan?")) {
-        setMessages([]); // Reset memory to prevent context hallucination
-        setTempKey("");  // Reset form
+        setMessages([]); 
+        setTempKey("");  
         setAuthError("");
-        setHasEntered(false); // Munculkan modal gatekeeper kembali
+        setHasEntered(false); 
       }
     };
 
-    // --- MAIN APP LOGIC ---
     const handleClearChat = () => {
       if (messages.length === 0) return;
       if (window.confirm("Bersihkan layar chat? Ingatan AI tentang obrolan ini akan dihapus.")) {
@@ -268,15 +257,9 @@
       }
     };
 
-    // 1. Tambahkan state baru untuk efek dragging
-    const [isDragging, setIsDragging] = useState(false);
-
-    // 2. Fungsi Utama untuk Memproses File (Dipakai oleh Input & Drag-Drop)
     const processFile = async (file) => {
-      // 1. Validasi awal: Pastikan file ada
+      // Validasi file
       if (!file) return;
-
-      // 2. Validasi tipe file (PDF saja)
       if (file.type !== "application/pdf") {
         setUploadStatus({ type: "error", msg: "Hanya PDF yang diterima." });
         return;
@@ -289,17 +272,16 @@
       formData.append("file", file);
 
       try {
-        // 3. Proses Upload ke Backend
         const res = await fetch(`${API_BASE}/upload`, { 
           method: "POST", 
           headers: getHeaders(false), 
           body: formData 
         });
         
-        const data = await res.json(); // Variabel 'data' didefinisikan di sini
+        const data = await res.json(); 
 
         if (res.ok) {
-          // 4. VALIDASI KETAT: Hanya tambah ke list jika filename valid dan bukan "null"
+          // Validasi ketat nama file sebelum disimpan
           if (data.filename && data.filename !== "null" && typeof data.filename === "string") {
             setFiles(prev => {
               if (!prev.includes(data.filename)) {
@@ -312,24 +294,21 @@
           const successMsg = `📄 Dokumen "${data.filename}" berhasil diindeks!\nBerhasil memproses ${data.num_chunks} potongan teks.\n\nSilakan ajukan pertanyaan seputar dokumen tersebut.`;
           setUploadStatus({ type: "success", msg: successMsg });
         } else {
-          setUploadStatus({ type: "error", msg: data.message || "Upload gagal." });
+          setUploadStatus({ type: "error", msg: data.detail || "Upload gagal." });
         }
       } catch (err) {
-        console.error("Upload Error:", err);
         setUploadStatus({ type: "error", msg: "Gagal terhubung ke server." });
       } finally {
         setIsUploading(false);
       }
     };
 
-    // 3. Handler untuk Input File Tradisional
     const handleFileSelect = (e) => {
       const file = e.target.files?.[0];
       processFile(file);
-      e.target.value = ''; // Reset input agar bisa upload file yang sama lagi
+      e.target.value = ''; 
     };
 
-    // 4. Handlers untuk Drag and Drop
     const handleDrag = (e) => {
       e.preventDefault();
       e.stopPropagation();
@@ -350,7 +329,7 @@
     };
 
     const handleDeleteFile = async (filename) => {
-      if (!filename || filename === "null") return; // Jangan kirim jika tidak valid
+      if (!filename || filename === "null") return; // Mencegah payload yang tidak valid
       
       try {
         const res = await fetch(`${API_BASE}/delete_file`, { 
@@ -360,7 +339,7 @@
         });
         if (res.ok) {
           setFiles(prev => prev.filter(f => f !== filename));
-          setUploadStatus({ type: "success", msg: `File ${filename} berhasil dihapus dari sistem.` });
+          setUploadStatus({ type: "success", msg: `File ${filename} berhasil dihapus.` });
         }
       } catch { 
         setUploadStatus({ type: "error", msg: "Gagal menghubungi AI Gateway." }); 
