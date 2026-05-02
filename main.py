@@ -3,6 +3,9 @@ import shutil
 import PyPDF2
 import chromadb
 import ollama
+import json
+import urllib.request
+import urllib.error
 from fastapi import FastAPI, UploadFile, File, HTTPException, Depends, Header
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -25,15 +28,15 @@ app.add_middleware(
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 CHROMA_DB_PATH = os.path.join(BASE_DIR, "chroma_db")
 STATIC_DIR = os.path.join(BASE_DIR, "static")
-COLLECTION_NAME = "expert_system_docs"
+COLLECTION_NAME_BASE = "expert_system_docs"
 
 if not os.path.exists(STATIC_DIR):
     os.makedirs(STATIC_DIR)
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
-# Konfigurasi G4 Local Service
+# Konfigurasi Layanan Lokal
 SECRET_API_KEY = os.getenv("SECRET_API_KEY", "g4-rahasia")
-OLLAMA_MODEL = "qwen2.5:0.5b"
+OLLAMA_MODEL = ""
 local_client = ollama.Client(host='http://localhost:11434')
 
 # --- SECURITY & ROUTING DEPENDENCY ---
@@ -57,45 +60,91 @@ def get_auth_context(
     
     raise HTTPException(status_code=400, detail="Mode layanan tidak dikenali.")
 
-# --- EMBEDDING LOGIC ---
+# --- EMBEDDING LOGIC (HYBRID) ---
+# --- EMBEDDING LOGIC (HYBRID) ---
+# --- EMBEDDING LOGIC (HYBRID) ---
 class HybridEmbeddingFunction:
+    def __init__(self, mode="local", api_key=None):
+        self.mode = mode
+        self.api_key = api_key
+
     def name(self):
-        return "hybrid-embedding"
+        """Method wajib yang dicari oleh ChromaDB untuk validasi koleksi"""
+        return f"hybrid-embedding-{self.mode}"
 
     def __call__(self, input: list[str]) -> list[list[float]]:
-        # ChromaDB memanggil fungsi ini secara langsung
-        return self.embed_documents(input)
+        # ChromaDB memanggil fungsi ini saat .add()
+        if self.mode == "cloud" and self.api_key:
+            return self.embed_cloud(input)
+        return self.embed_local(input)
 
     def embed_documents(self, input: list[str]) -> list[list[float]]:
-        """Logika utama untuk mengubah teks menjadi vektor"""
+        """Kompatibilitas untuk ChromaDB/Langchain saat menyimpan dokumen"""
+        return self.__call__(input)
+
+    def embed_query(self, input: list[str]) -> list[list[float]]:
+        """Kompatibilitas wajib untuk ChromaDB saat melakukan pencarian (.query)"""
+        return self.__call__(input)
+
+    def embed_local(self, input: list[str]) -> list[list[float]]:
+        """Menggunakan Ollama untuk Embedding (Dimensi: 896 untuk Qwen2.5:0.5b)"""
         embeddings = []
         for text in input:
             try:
-                # Menggunakan Ollama untuk Embedding
                 response = local_client.embeddings(model=OLLAMA_MODEL, prompt=text)
                 embeddings.append(response['embedding'])
             except Exception as e:
-                print(f"❌ Error Embedding: {e}")
-                # Dimensi 896 sesuai untuk Qwen2.5:0.5b
+                print(f"❌ Error Local Embedding: {e}")
                 embeddings.append([0.0] * 896)
         return embeddings
 
-    def embed_query(self, input: list[str]) -> list[list[float]]:
-        """Metode wajib yang dicari ChromaDB saat menjalankan .query()"""
-        # Arahkan logika embed query kembali ke embed_documents
-        return self.embed_documents(input)
+    def embed_cloud(self, input: list[str]) -> list[list[float]]:
+        """Menggunakan Gemini API untuk Embedding (Dimensi: 768)"""
+        embeddings = []
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key={self.api_key}"
+        for text in input:
+            try:
+                payload = {
+                    "model": "models/text-embedding-004", 
+                    "content": {"parts": [{"text": text}]}
+                }
+                req = urllib.request.Request(
+                    url, 
+                    data=json.dumps(payload).encode('utf-8'), 
+                    headers={'Content-Type': 'application/json'},
+                    method='POST'
+                )
+                with urllib.request.urlopen(req) as res:
+                    data = json.loads(res.read().decode('utf-8'))
+                    embeddings.append(data['embedding']['values'])
+            except Exception as e:
+                print(f"❌ Error Cloud Embedding: {e}")
+                embeddings.append([0.0] * 768)
+        return embeddings
 
 # --- RAG ENGINE ---
 class RAGChatbot:
     def __init__(self):
         self.chroma_client = chromadb.PersistentClient(path=CHROMA_DB_PATH)
-        self.embed_fn = HybridEmbeddingFunction()
-        self.collection = self.chroma_client.get_or_create_collection(
-            name=COLLECTION_NAME,
-            embedding_function=self.embed_fn
+
+    def get_collection(self, auth_ctx):
+        """Membuat/Mengambil koleksi berdasarkan mode agar dimensi vektor tidak bentrok"""
+        mode = auth_ctx["mode"]
+        api_key = auth_ctx.get("key")
+        
+        # Nama koleksi dibedakan: expert_system_docs_local atau expert_system_docs_cloud
+        col_name = f"{COLLECTION_NAME_BASE}_{mode}"
+        embed_fn = HybridEmbeddingFunction(mode=mode, api_key=api_key)
+        
+        return self.chroma_client.get_or_create_collection(
+            name=col_name,
+            embedding_function=embed_fn
         )
 
-    def process_pdf(self, file_path, filename, session_id):
+    def process_pdf(self, file_path, filename, auth_ctx):
+        session_id = auth_ctx["session_id"]
+        collection = self.get_collection(auth_ctx)
+
         text = ""
         with open(file_path, "rb") as f:
             pdf_reader = PyPDF2.PdfReader(f)
@@ -118,16 +167,15 @@ class RAGChatbot:
 
         if chunks:
             ids = [f"doc_{session_id}_{os.urandom(4).hex()}_{i}" for i in range(len(chunks))]
-            # Menambahkan METADATA untuk isolasi user dan nama file
             metadatas = [{"session_id": session_id, "filename": filename} for _ in chunks]
-            self.collection.add(documents=chunks, ids=ids, metadatas=metadatas)
+            collection.add(documents=chunks, ids=ids, metadatas=metadatas)
             return len(chunks)
         return 0
 
-    def delete_document(self, filename, session_id):
-        # Menghapus secara presisi berdasarkan kepemilikan dan nama file
+    def delete_document(self, filename, auth_ctx):
+        collection = self.get_collection(auth_ctx)
         try:
-            self.collection.delete(where={"$and": [{"session_id": session_id}, {"filename": filename}]})
+            collection.delete(where={"$and": [{"session_id": auth_ctx["session_id"]}, {"filename": filename}]})
             return True
         except:
             return False
@@ -135,9 +183,10 @@ class RAGChatbot:
     def ask(self, query, history, language, auth_ctx):
         session_id = auth_ctx["session_id"]
         mode = auth_ctx["mode"]
+        collection = self.get_collection(auth_ctx)
         
-        # 1. RETRIEVAL DENGAN ISOLASI SESI
-        results = self.collection.query(
+        # 1. RETRIEVAL DENGAN ISOLASI SESI & MODE
+        results = collection.query(
             query_texts=[query], 
             n_results=5,
             where={"session_id": session_id} 
@@ -164,16 +213,12 @@ class RAGChatbot:
             f"Jawablah dengan {target_lang} yang baik."
         )
 
-        # 3. DYNAMIC ROUTING (LOCAL vs CLOUD)
+        # 3. DYNAMIC ROUTING (LOCAL vs CLOUD) UNTUK GENERASI TEKS
         try:
             if mode == "local":
                 response = local_client.generate(model=OLLAMA_MODEL, prompt=system_prompt)
                 return response['response']
             else:
-                import urllib.request
-                import urllib.error
-                import json
-                
                 api_key = auth_ctx["key"]
                 url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={api_key}"
                 
@@ -226,7 +271,8 @@ async def upload_pdf(file: UploadFile = File(...), auth_ctx: dict = Depends(get_
         with open(temp_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
 
-        num_chunks = bot.process_pdf(temp_path, file.filename, auth_ctx["session_id"])
+        # Kirim seluruh auth_ctx, bukan hanya session_id
+        num_chunks = bot.process_pdf(temp_path, file.filename, auth_ctx)
         
         return {
             "status": "success", 
@@ -234,17 +280,15 @@ async def upload_pdf(file: UploadFile = File(...), auth_ctx: dict = Depends(get_
             "filename": file.filename
         }
     except Exception as e:
-        # Melempar HTTPException agar frontend mengenali ini sebagai error (bukan 200 OK)
         raise HTTPException(status_code=500, detail=str(e))
     finally:
-        # Mencegah penumpukan file sampah jika terjadi error
         if os.path.exists(temp_path):
             os.remove(temp_path)
 
 @app.post("/delete_file")
 async def delete_file(data: DeleteRequest, auth_ctx: dict = Depends(get_auth_context)):
-    print(f"DEBUG: Mencoba menghapus {data.filename} untuk sesi {auth_ctx['session_id']}")
-    success = bot.delete_document(data.filename, auth_ctx["session_id"])
+    print(f"DEBUG: Mencoba menghapus {data.filename} untuk sesi {auth_ctx['session_id']} (Mode: {auth_ctx['mode']})")
+    success = bot.delete_document(data.filename, auth_ctx)
     if success:
         return {"status": "success"}
     raise HTTPException(status_code=500, detail="Gagal menghapus file di database.")
