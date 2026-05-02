@@ -13,6 +13,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from dotenv import load_dotenv
 
+#HALO MOTI
+
 # --- INITIALIZATION ---
 load_dotenv()
 app = FastAPI()
