@@ -14,6 +14,7 @@ from pydantic import BaseModel
 from dotenv import load_dotenv
 
 #HALO MOTI
+# HALO OJIKU
 
 # --- INITIALIZATION ---
 load_dotenv()
