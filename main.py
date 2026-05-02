@@ -36,7 +36,7 @@ app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 # Konfigurasi Layanan Lokal
 SECRET_API_KEY = os.getenv("SECRET_API_KEY", "g4-rahasia")
-OLLAMA_MODEL = ""
+OLLAMA_MODEL = "qwen2.5:0.5b"  # Pastikan model ini sudah di-pull di Ollama Anda
 local_client = ollama.Client(host='http://localhost:11434')
 
 # --- SECURITY & ROUTING DEPENDENCY ---
