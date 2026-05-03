@@ -90,16 +90,16 @@ class HybridEmbeddingFunction:
         return self.__call__(input)
 
     def embed_local(self, input: list[str]) -> list[list[float]]:
-        """Menggunakan Ollama untuk Embedding (Dimensi: 896 untuk Qwen2.5:0.5b)"""
+        """Menggunakan Ollama untuk Embedding (Dimensi: 768 untuk nomic-embed-text)"""
         embeddings = []
         for text in input:
             try:
-                response = local_client.embeddings(model=OLLAMA_MODEL, prompt=text)
+                response = local_client.embeddings(model="nomic-embed-text", prompt=text)
                 embeddings.append(response['embedding'])
                 time.sleep(0.05)
             except Exception as e:
                 print(f"❌ Error Local Embedding: {e}")
-                embeddings.append([0.0] * 896)
+                embeddings.append([0.0] * 768)
         return embeddings
 
     def embed_cloud(self, input: list[str]) -> list[list[float]]:
