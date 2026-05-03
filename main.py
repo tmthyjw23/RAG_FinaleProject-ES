@@ -205,12 +205,15 @@ class RAGChatbot:
         target_lang = "bahasa Indonesia" if language == "Indonesia" else ("English" if language == "English" else "Mandarin (Chinese)")
 
         system_prompt = (
-            f"Anda adalah Sistem Pakar yang disiplin. Gunakan KONTEKS dokumen berikut untuk menjawab jika relevan. "
-            f"Jika tidak ada di konteks, Anda boleh menggunakan pengetahuan umum Anda tapi beritahu bahwa itu bukan dari dokumen.\n\n"
-            f"KONTEKS DOKUMEN:\n{context if context else 'Belum ada dokumen yang diunggah pengguna.'}\n\n"
-            f"RIWAYAT OBROLAN TERAKHIR:\n{history_text}\n"
-            f"PERTANYAAN BARU: {query}\n\n"
-            f"Jawablah dengan {target_lang} yang baik."
+            f"Anda adalah G4 Expert System, seorang analis data yang sangat teliti.\n"
+            f"ATURAN MUTLAK:\n"
+            f"1. Anda WAJIB menjawab HANYA berdasarkan informasi pada KONTEKS DOKUMEN di bawah.\n"
+            f"2. Jika jawaban tidak ditemukan dalam konteks, Anda harus menjawab: 'Maaf, informasi tersebut tidak ditemukan dalam basis pengetahuan dokumen Anda.'\n"
+            f"3. Jangan pernah menebak atau memberikan informasi fiktif.\n\n"
+            f"KONTEKS DOKUMEN:\n{context if context else 'Belum ada dokumen.'}\n\n"
+            f"RIWAYAT:\n{history_text}\n"
+            f"PERTANYAAN: {query}\n\n"
+            f"Berikan jawaban analitis dalam {target_lang}."
         )
 
         # 3. DYNAMIC ROUTING (LOCAL vs CLOUD) UNTUK GENERASI TEKS
