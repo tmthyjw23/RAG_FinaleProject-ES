@@ -13,6 +13,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from dotenv import load_dotenv
 
+#hallo moti
+
 # --- INITIALIZATION ---
 load_dotenv()
 app = FastAPI()
@@ -36,7 +38,7 @@ app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 # Konfigurasi Layanan Lokal
 SECRET_API_KEY = os.getenv("SECRET_API_KEY", "g4-rahasia")
-OLLAMA_MODEL = "qwen2.5:0.5b"  # Pastikan model ini sudah di-pull di Ollama Anda
+OLLAMA_MODEL = "qwen2.5:0.5b"
 local_client = ollama.Client(host='http://localhost:11434')
 
 # --- SECURITY & ROUTING DEPENDENCY ---
@@ -153,23 +155,24 @@ class RAGChatbot:
                 if extracted:
                     text += extracted + "\n"
 
-        paragraphs = text.split('\n')
+        # --- KODE BARU GEORGE: Chunking dengan Overlap ---
         chunks = []
-        current_chunk = ""
-        for p in paragraphs:
-            if len(current_chunk) + len(p) < 800:
-                current_chunk += p + "\n"
-            else:
-                if current_chunk.strip(): chunks.append(current_chunk.strip())
-                current_chunk = p + "\n"
-        if current_chunk.strip(): chunks.append(current_chunk.strip())
-        chunks = [c for c in chunks if len(c) > 15]
+        chunk_size = 800
+        overlap = 150
+        start = 0
+        
+        while start < len(text):
+            end = start + chunk_size
+            chunk = text[start:end]
+            if len(chunk.strip()) > 15:
+                chunks.append(chunk.strip())
+            start += (chunk_size - overlap) # Geser window mundur sedikit
 
         if chunks:
             ids = [f"doc_{session_id}_{os.urandom(4).hex()}_{i}" for i in range(len(chunks))]
             metadatas = [{"session_id": session_id, "filename": filename} for _ in chunks]
             collection.add(documents=chunks, ids=ids, metadatas=metadatas)
-            return len(chunks)
+            return len(chunks)  
         return 0
 
     def delete_document(self, filename, auth_ctx):
