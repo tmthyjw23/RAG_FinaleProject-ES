@@ -303,6 +303,19 @@
       }
     };
 
+    const handleClearAllFiles = async () => {
+      if (files.length === 0) return;
+      if (window.confirm("⚠️ Peringatan: Ini akan menghapus SEMUA dokumen dari basis pengetahuan Anda di mode ini. Lanjutkan?")) {
+        try {
+          const res = await fetch(`${API_BASE}/delete_all_files`, { method: "POST", headers: getHeaders(true) });
+          if (res.ok) {
+            setFiles([]);
+            setUploadStatus({ type: "success", msg: "Semua dokumen berhasil dibersihkan." });
+          }
+        } catch { setUploadStatus({ type: "error", msg: "Gagal membersihkan sistem." }); }
+      }
+    };
+
     const handleFileSelect = (e) => {
       const file = e.target.files?.[0];
       processFile(file);
@@ -344,6 +357,10 @@
       } catch { 
         setUploadStatus({ type: "error", msg: "Gagal menghubungi AI Gateway." }); 
       }
+    };
+    const handleCopy = (text) => {
+      navigator.clipboard.writeText(text);
+      alert("Analisa berhasil disalin!");
     };
 
     const handleSend = async () => {
@@ -455,6 +472,11 @@
                 <button className="del-btn" onClick={() => handleDeleteFile(f)} title="Hapus">×</button>
               </div>
             ))}
+            {files.length > 0 && (
+            <button className="btn-clear" onClick={handleClearAllFiles} style={{marginTop: '12px', padding: '8px', fontSize: '10px'}}>
+              🗑️ Reset Basis Pengetahuan
+            </button>
+          )}
           </div>
           
           {uploadStatus && (
@@ -500,9 +522,16 @@
               <div key={msg.id} className={`bubble-row ${msg.role}`}>
                 <div className={`bubble-avatar ${msg.role === 'user' ? 'user-av' : 'bot-av'}`}>{msg.role === 'user' ? 'G4' : 'AI'}</div>
                 <div className="bubble-content">
-                  <div className="bubble-meta">
+                   <div className="bubble-meta">
                     <span>{msg.role === 'user' ? 'Anda' : 'Expert System'}</span>
-                    <span>{msg.time}</span>
+                    <div style={{display: 'flex', gap: '12px', alignItems: 'center'}}>
+                      {msg.role === 'bot' && (
+                        <button onClick={() => handleCopy(msg.text)} style={{background: 'none', border: 'none', cursor: 'pointer', fontSize: '11px', color: 'var(--text-muted)'}}>
+                          📋 Salin
+                        </button>
+                      )}
+                      <span>{msg.time}</span>
+                    </div>
                   </div>
                   <div className={`bubble ${msg.role}`} style={{whiteSpace: 'pre-wrap'}}>{msg.text}</div>
                 </div>
