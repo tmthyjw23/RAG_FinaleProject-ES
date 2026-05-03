@@ -345,6 +345,10 @@
         setUploadStatus({ type: "error", msg: "Gagal menghubungi AI Gateway." }); 
       }
     };
+    const handleCopy = (text) => {
+      navigator.clipboard.writeText(text);
+      alert("Analisa berhasil disalin!");
+    };
 
     const handleSend = async () => {
       const query = input.trim();
@@ -500,9 +504,16 @@
               <div key={msg.id} className={`bubble-row ${msg.role}`}>
                 <div className={`bubble-avatar ${msg.role === 'user' ? 'user-av' : 'bot-av'}`}>{msg.role === 'user' ? 'G4' : 'AI'}</div>
                 <div className="bubble-content">
-                  <div className="bubble-meta">
+                   <div className="bubble-meta">
                     <span>{msg.role === 'user' ? 'Anda' : 'Expert System'}</span>
-                    <span>{msg.time}</span>
+                    <div style={{display: 'flex', gap: '12px', alignItems: 'center'}}>
+                      {msg.role === 'bot' && (
+                        <button onClick={() => handleCopy(msg.text)} style={{background: 'none', border: 'none', cursor: 'pointer', fontSize: '11px', color: 'var(--text-muted)'}}>
+                          📋 Salin
+                        </button>
+                      )}
+                      <span>{msg.time}</span>
+                    </div>
                   </div>
                   <div className={`bubble ${msg.role}`} style={{whiteSpace: 'pre-wrap'}}>{msg.text}</div>
                 </div>
