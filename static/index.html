@@ -303,6 +303,19 @@
       }
     };
 
+    const handleClearAllFiles = async () => {
+      if (files.length === 0) return;
+      if (window.confirm("⚠️ Peringatan: Ini akan menghapus SEMUA dokumen dari basis pengetahuan Anda di mode ini. Lanjutkan?")) {
+        try {
+          const res = await fetch(`${API_BASE}/delete_all_files`, { method: "POST", headers: getHeaders(true) });
+          if (res.ok) {
+            setFiles([]);
+            setUploadStatus({ type: "success", msg: "Semua dokumen berhasil dibersihkan." });
+          }
+        } catch { setUploadStatus({ type: "error", msg: "Gagal membersihkan sistem." }); }
+      }
+    };
+
     const handleFileSelect = (e) => {
       const file = e.target.files?.[0];
       processFile(file);
@@ -455,6 +468,11 @@
                 <button className="del-btn" onClick={() => handleDeleteFile(f)} title="Hapus">×</button>
               </div>
             ))}
+            {files.length > 0 && (
+            <button className="btn-clear" onClick={handleClearAllFiles} style={{marginTop: '12px', padding: '8px', fontSize: '10px'}}>
+              🗑️ Reset Basis Pengetahuan
+            </button>
+          )}
           </div>
           
           {uploadStatus && (
