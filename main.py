@@ -12,6 +12,7 @@ from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from dotenv import load_dotenv
+import time
 
 #hallo moti
 
@@ -95,6 +96,7 @@ class HybridEmbeddingFunction:
             try:
                 response = local_client.embeddings(model=OLLAMA_MODEL, prompt=text)
                 embeddings.append(response['embedding'])
+                time.sleep(0.05)
             except Exception as e:
                 print(f"❌ Error Local Embedding: {e}")
                 embeddings.append([0.0] * 896)
@@ -147,31 +149,48 @@ class RAGChatbot:
         session_id = auth_ctx["session_id"]
         collection = self.get_collection(auth_ctx)
 
-        text = ""
+        chunks = []
+        current_chunk = ""
+        chunk_size = 800
+        overlap = 150
+
+        # KUNCI EFISIENSI 2: Streaming (Membaca dan memotong teks halaman per halaman)
         with open(file_path, "rb") as f:
             pdf_reader = PyPDF2.PdfReader(f)
             for page in pdf_reader.pages:
                 extracted = page.extract_text()
-                if extracted:
-                    text += extracted + "\n"
+                if not extracted:
+                    continue
+                
+                paragraphs = extracted.split('\n')
+                for p in paragraphs:
+                    if len(current_chunk) + len(p) < chunk_size:
+                        current_chunk += p + " "
+                    else:
+                        if len(current_chunk.strip()) > 15:
+                            chunks.append(current_chunk.strip())
+                        # Mengambil overlap dari bagian akhir chunk sebelumnya
+                        current_chunk = current_chunk[-overlap:] + " " + p + " "
 
-        # --- KODE BARU GEORGE: Chunking dengan Overlap ---
-        chunks = []
-        chunk_size = 800
-        overlap = 150
-        start = 0
-        
-        while start < len(text):
-            end = start + chunk_size
-            chunk = text[start:end]
-            if len(chunk.strip()) > 15:
-                chunks.append(chunk.strip())
-            start += (chunk_size - overlap) # Geser window mundur sedikit
+        if len(current_chunk.strip()) > 15:
+            chunks.append(current_chunk.strip())
 
+        # KUNCI EFISIENSI 3: Batch Insert
+        # Jangan memasukkan ribuan chunk sekaligus ke ChromaDB/Ollama. 
+        # Cicil sebanyak 50 chunk per pengiriman.
         if chunks:
             ids = [f"doc_{session_id}_{os.urandom(4).hex()}_{i}" for i in range(len(chunks))]
             metadatas = [{"session_id": session_id, "filename": filename} for _ in chunks]
-            collection.add(documents=chunks, ids=ids, metadatas=metadatas)
+            
+            batch_size = 50
+            for i in range(0, len(chunks), batch_size):
+                batch_chunks = chunks[i:i + batch_size]
+                batch_ids = ids[i:i + batch_size]
+                batch_metas = metadatas[i:i + batch_size]
+                
+                # Ini akan memicu embed_local secara bertahap (aman untuk VPS)
+                collection.add(documents=batch_chunks, ids=batch_ids, metadatas=batch_metas)
+                
             return len(chunks)  
         return 0
 
