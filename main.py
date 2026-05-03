@@ -285,6 +285,16 @@ async def upload_pdf(file: UploadFile = File(...), auth_ctx: dict = Depends(get_
         if os.path.exists(temp_path):
             os.remove(temp_path)
 
+@app.post("/delete_all_files")
+async def delete_all_files(auth_ctx: dict = Depends(get_auth_context)):
+    try:
+        # Mengambil koleksi yang benar (Local/Cloud) lalu menghapus dokumen user
+        collection = bot.get_collection(auth_ctx)
+        collection.delete(where={"session_id": auth_ctx["session_id"]})
+        return {"status": "success", "message": "Basis pengetahuan direset."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Gagal menghapus basis pengetahuan.")
+
 @app.post("/delete_file")
 async def delete_file(data: DeleteRequest, auth_ctx: dict = Depends(get_auth_context)):
     print(f"DEBUG: Mencoba menghapus {data.filename} untuk sesi {auth_ctx['session_id']} (Mode: {auth_ctx['mode']})")
