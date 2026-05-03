@@ -14,8 +14,6 @@ from pydantic import BaseModel
 from dotenv import load_dotenv
 import time
 
-#hallo moti
-
 # --- INITIALIZATION ---
 load_dotenv()
 app = FastAPI()
