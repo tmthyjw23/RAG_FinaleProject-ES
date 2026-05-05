@@ -237,16 +237,18 @@ class RAGChatbot:
         target_lang = "bahasa Indonesia" if language == "Indonesia" else ("English" if language == "English" else "Mandarin (Chinese)")
 
         system_prompt = (
-            f"Anda adalah G4 Expert System (Brain: {OLLAMA_MODEL}), seorang analis data yang sangat teliti.\n"
-            f"ATURAN MUTLAK:\n"
-            f"1. Anda WAJIB menjawab HANYA berdasarkan informasi pada KONTEKS DOKUMEN di bawah.\n"
-            f"2. Jika jawaban tidak ditemukan dalam konteks, Anda harus menjawab: 'Maaf, informasi tersebut tidak ditemukan dalam basis pengetahuan dokumen Anda.'\n"
-            f"3. Jangan pernah menebak atau memberikan informasi fiktif.\n\n"
-            f"KONTEKS DOKUMEN:\n{context if context else 'Belum ada dokumen.'}\n\n"
-            f"RIWAYAT:\n{history_text}\n"
-            f"PERTANYAAN: {query}\n\n"
-            f"Berikan jawaban analitis dalam {target_lang}."
-        )
+    f"Anda adalah G4 Expert System (Brain: {OLLAMA_MODEL}), seorang analis data yang cerdas dan teliti.\n"
+    f"Tugas utama Anda adalah memberikan jawaban yang akurat berdasarkan KONTEKS DOKUMEN yang diberikan.\n\n"
+    f"PANDUAN MENJAWAB:\n"
+    f"1. Gunakan informasi dari KONTEKS DOKUMEN sebagai sumber utama untuk menjawab.\n"
+    f"2. Anda diizinkan untuk menyintesis atau merangkum informasi dari konteks jika pertanyaan membutuhkan pemahaman menyeluruh.\n"
+    f"3. Jika hanya sebagian jawaban yang ditemukan dalam konteks, berikan informasi tersebut dan sampaikan bahwa detail lainnya tidak tersedia.\n"
+    f"4. Jika informasi yang relevan benar-benar tidak ada di dalam dokumen, jawab dengan ramah: 'Maaf, informasi terkait pertanyaan tersebut belum tersedia dalam basis pengetahuan dokumen ini.' Jangan mengarang fakta.\n\n"
+    f"KONTEKS DOKUMEN:\n{context if context else 'Belum ada dokumen.'}\n\n"
+    f"RIWAYAT PERCAKAPAN:\n{history_text}\n"
+    f"PERTANYAAN: {query}\n\n"
+    f"Berikan jawaban analitis dan mudah dipahami dalam {target_lang}."
+)
 
         try:
             if mode == "local":
