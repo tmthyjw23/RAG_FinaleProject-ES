@@ -36,9 +36,9 @@ if not os.path.exists(STATIC_DIR):
     os.makedirs(STATIC_DIR)
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
-# Konfigurasi Layanan Lokal - UPDATE: Menggunakan Gemma 4 31B Cloud
+# Konfigurasi Layanan Lokal
 SECRET_API_KEY = os.getenv("SECRET_API_KEY", "g4-rahasia")
-OLLAMA_MODEL = "gemma4:31b-cloud" 
+OLLAMA_MODEL = "qwen2.5-coder:3b"
 local_client = ollama.Client(host='http://localhost:11434')
 
 # --- SECURITY & ROUTING DEPENDENCY ---
@@ -237,7 +237,7 @@ class RAGChatbot:
         target_lang = "bahasa Indonesia" if language == "Indonesia" else ("English" if language == "English" else "Mandarin (Chinese)")
 
         system_prompt = (
-            f"Anda adalah G4 Expert System (Brain: {OLLAMA_MODEL}), seorang analis data yang sangat teliti.\n"
+            f"Anda adalah G4 Expert System, seorang analis data yang sangat teliti.\n"
             f"ATURAN MUTLAK:\n"
             f"1. Anda WAJIB menjawab HANYA berdasarkan informasi pada KONTEKS DOKUMEN di bawah.\n"
             f"2. Jika jawaban tidak ditemukan dalam konteks, Anda harus menjawab: 'Maaf, informasi tersebut tidak ditemukan dalam basis pengetahuan dokumen Anda.'\n"
