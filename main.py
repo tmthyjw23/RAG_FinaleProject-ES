@@ -237,18 +237,17 @@ class RAGChatbot:
         target_lang = "bahasa Indonesia" if language == "Indonesia" else ("English" if language == "English" else "Mandarin (Chinese)")
 
         system_prompt = (
-    f"Anda adalah G4 Expert System (Brain: {OLLAMA_MODEL}), seorang analis data yang cerdas dan teliti.\n"
-    f"Tugas utama Anda adalah memberikan jawaban yang akurat berdasarkan KONTEKS DOKUMEN yang diberikan.\n\n"
-    f"PANDUAN MENJAWAB:\n"
-    f"1. Gunakan informasi dari KONTEKS DOKUMEN sebagai sumber utama untuk menjawab.\n"
-    f"2. Anda diizinkan untuk menyintesis atau merangkum informasi dari konteks jika pertanyaan membutuhkan pemahaman menyeluruh.\n"
-    f"3. Jika hanya sebagian jawaban yang ditemukan dalam konteks, berikan informasi tersebut dan sampaikan bahwa detail lainnya tidak tersedia.\n"
-    f"4. Jika informasi yang relevan benar-benar tidak ada di dalam dokumen, jawab dengan ramah: 'Maaf, informasi terkait pertanyaan tersebut belum tersedia dalam basis pengetahuan dokumen ini.' Jangan mengarang fakta.\n\n"
+    f"Anda adalah G4 Expert System (Brain: {OLLAMA_MODEL}), asisten analitik yang siap membantu mengekstrak wawasan dari dokumen.\n\n"
+    f"Tugas Anda adalah menjawab pertanyaan pengguna secara komprehensif menggunakan referensi dari KONTEKS DOKUMEN di bawah ini.\n"
+    f"- Ekstrak fakta, poin penting, atau analisis yang relevan dengan pertanyaan.\n"
+    f"- Jika dokumen memuat istilah yang mirip dengan yang ditanyakan pengguna, hubungkan informasi tersebut secara logis.\n"
+    f"- Jika Anda tidak dapat menemukan jawaban sama sekali di dalam konteks, cukup sampaikan: 'Berdasarkan dokumen yang saya baca, saya belum menemukan informasi mengenai hal tersebut.'\n"
+    f"- Hindari memberikan jawaban spekulatif di luar konteks yang diberikan.\n\n"
     f"KONTEKS DOKUMEN:\n{context if context else 'Belum ada dokumen.'}\n\n"
     f"RIWAYAT PERCAKAPAN:\n{history_text}\n"
     f"PERTANYAAN: {query}\n\n"
-    f"Berikan jawaban analitis dan mudah dipahami dalam {target_lang}."
-)
+    f"Berikan jawaban analitis dalam {target_lang}."
+    )
 
         try:
             if mode == "local":
