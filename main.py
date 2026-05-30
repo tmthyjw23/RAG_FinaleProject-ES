@@ -7,13 +7,13 @@ import json
 import urllib.request
 import urllib.error
 from fastapi import FastAPI, UploadFile, File, HTTPException, Depends, Header
+from fastapi.concurrency import run_in_threadpool # Mencegah server freeze
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from dotenv import load_dotenv
-
-#hallo moti
+import time
 
 # --- INITIALIZATION ---
 load_dotenv()
@@ -36,9 +36,9 @@ if not os.path.exists(STATIC_DIR):
     os.makedirs(STATIC_DIR)
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
-# Konfigurasi Layanan Lokal
+# Konfigurasi Layanan Lokal - UPDATE: Menggunakan Gemma 4 31B Cloud
 SECRET_API_KEY = os.getenv("SECRET_API_KEY", "g4-rahasia")
-OLLAMA_MODEL = "qwen2.5:0.5b"
+OLLAMA_MODEL = "gemma4:31b-cloud" 
 local_client = ollama.Client(host='http://localhost:11434')
 
 # --- SECURITY & ROUTING DEPENDENCY ---
@@ -63,8 +63,6 @@ def get_auth_context(
     raise HTTPException(status_code=400, detail="Mode layanan tidak dikenali.")
 
 # --- EMBEDDING LOGIC (HYBRID) ---
-# --- EMBEDDING LOGIC (HYBRID) ---
-# --- EMBEDDING LOGIC (HYBRID) ---
 class HybridEmbeddingFunction:
     def __init__(self, mode="local", api_key=None):
         self.mode = mode
@@ -81,7 +79,7 @@ class HybridEmbeddingFunction:
         return self.embed_local(input)
 
     def embed_documents(self, input: list[str]) -> list[list[float]]:
-        """Kompatibilitas untuk ChromaDB/Langchain saat menyimpan dokumen"""
+        """Kompatibilitas untuk ChromaDB saat menyimpan dokumen"""
         return self.__call__(input)
 
     def embed_query(self, input: list[str]) -> list[list[float]]:
@@ -89,15 +87,17 @@ class HybridEmbeddingFunction:
         return self.__call__(input)
 
     def embed_local(self, input: list[str]) -> list[list[float]]:
-        """Menggunakan Ollama untuk Embedding (Dimensi: 896 untuk Qwen2.5:0.5b)"""
+        """Menggunakan Ollama untuk Embedding (Dimensi: 768 untuk nomic-embed-text)"""
         embeddings = []
         for text in input:
             try:
-                response = local_client.embeddings(model=OLLAMA_MODEL, prompt=text)
+                response = local_client.embeddings(model="nomic-embed-text:latest", prompt=text)
                 embeddings.append(response['embedding'])
+                # Jeda tipis agar CPU/RAM server tidak spike hingga 100%
+                time.sleep(0.05)
             except Exception as e:
                 print(f"❌ Error Local Embedding: {e}")
-                embeddings.append([0.0] * 896)
+                embeddings.append([0.0] * 768)
         return embeddings
 
     def embed_cloud(self, input: list[str]) -> list[list[float]]:
@@ -134,7 +134,6 @@ class RAGChatbot:
         mode = auth_ctx["mode"]
         api_key = auth_ctx.get("key")
         
-        # Nama koleksi dibedakan: expert_system_docs_local atau expert_system_docs_cloud
         col_name = f"{COLLECTION_NAME_BASE}_{mode}"
         embed_fn = HybridEmbeddingFunction(mode=mode, api_key=api_key)
         
@@ -144,36 +143,68 @@ class RAGChatbot:
         )
 
     def process_pdf(self, file_path, filename, auth_ctx):
+        """Fungsi sinkron: Akan menahan respons sampai selesai"""
+        print(f"⚙️ Memulai pemrosesan dokumen: {filename}")
         session_id = auth_ctx["session_id"]
         collection = self.get_collection(auth_ctx)
 
-        text = ""
-        with open(file_path, "rb") as f:
-            pdf_reader = PyPDF2.PdfReader(f)
-            for page in pdf_reader.pages:
-                extracted = page.extract_text()
-                if extracted:
-                    text += extracted + "\n"
-
-        # --- KODE BARU GEORGE: Chunking dengan Overlap ---
         chunks = []
+        current_chunk = ""
         chunk_size = 800
-        overlap = 150
-        start = 0
-        
-        while start < len(text):
-            end = start + chunk_size
-            chunk = text[start:end]
-            if len(chunk.strip()) > 15:
-                chunks.append(chunk.strip())
-            start += (chunk_size - overlap) # Geser window mundur sedikit
+        overlap_words = 30 # Overlap berbasis jumlah kata untuk akurasi
 
-        if chunks:
-            ids = [f"doc_{session_id}_{os.urandom(4).hex()}_{i}" for i in range(len(chunks))]
-            metadatas = [{"session_id": session_id, "filename": filename} for _ in chunks]
-            collection.add(documents=chunks, ids=ids, metadatas=metadatas)
-            return len(chunks)  
-        return 0
+        try:
+            # 1. Ekstraksi dan Chunking dengan Overlap Kata
+            with open(file_path, "rb") as f:
+                pdf_reader = PyPDF2.PdfReader(f)
+                for page in pdf_reader.pages:
+                    extracted = page.extract_text()
+                    if not extracted:
+                        continue
+                    
+                    paragraphs = extracted.split('\n')
+                    for p in paragraphs:
+                        clean_p = " ".join(p.split())
+                        if not clean_p:
+                            continue
+
+                        if len(current_chunk) + len(clean_p) < chunk_size:
+                            current_chunk += clean_p + " "
+                        else:
+                            if len(current_chunk.strip()) > 15:
+                                chunks.append(current_chunk.strip())
+                            
+                            words = current_chunk.split()
+                            if len(words) > overlap_words:
+                                overlap_text = " ".join(words[-overlap_words:])
+                            else:
+                                overlap_text = current_chunk
+                            
+                            current_chunk = overlap_text + " " + clean_p + " "
+
+            if len(current_chunk.strip()) > 15:
+                chunks.append(current_chunk.strip())
+
+            # 2. Batch Insert ke ChromaDB
+            if chunks:
+                ids = [f"doc_{session_id}_{os.urandom(4).hex()}_{i}" for i in range(len(chunks))]
+                metadatas = [{"session_id": session_id, "filename": filename} for _ in chunks]
+                
+                batch_size = 50
+                for i in range(0, len(chunks), batch_size):
+                    batch_chunks = chunks[i:i + batch_size]
+                    batch_ids = ids[i:i + batch_size]
+                    batch_metas = metadatas[i:i + batch_size]
+                    
+                    collection.add(documents=batch_chunks, ids=batch_ids, metadatas=batch_metas)
+                
+                print(f"✅ Selesai memproses {filename} ({len(chunks)} chunks di-embed).")
+            
+            return len(chunks)
+
+        except Exception as e:
+            print(f"❌ Error saat memproses PDF ({filename}): {e}")
+            raise e # Melempar error agar ditangkap oleh endpoint
 
     def delete_document(self, filename, auth_ctx):
         collection = self.get_collection(auth_ctx)
@@ -188,7 +219,6 @@ class RAGChatbot:
         mode = auth_ctx["mode"]
         collection = self.get_collection(auth_ctx)
         
-        # 1. RETRIEVAL DENGAN ISOLASI SESI & MODE
         results = collection.query(
             query_texts=[query], 
             n_results=5,
@@ -199,7 +229,6 @@ class RAGChatbot:
         if results["documents"] and results["documents"][0]:
             context = "\n---\n".join(results["documents"][0])
 
-        # 2. MEMBANGUN INGATAN (MEMORY)
         history_text = ""
         for msg in history[-4:]:
             role = "Sistem Pakar" if msg["role"] == "bot" else "Pengguna"
@@ -208,18 +237,18 @@ class RAGChatbot:
         target_lang = "bahasa Indonesia" if language == "Indonesia" else ("English" if language == "English" else "Mandarin (Chinese)")
 
         system_prompt = (
-            f"Anda adalah G4 Expert System, seorang analis data yang sangat teliti.\n"
-            f"ATURAN MUTLAK:\n"
-            f"1. Anda WAJIB menjawab HANYA berdasarkan informasi pada KONTEKS DOKUMEN di bawah.\n"
-            f"2. Jika jawaban tidak ditemukan dalam konteks, Anda harus menjawab: 'Maaf, informasi tersebut tidak ditemukan dalam basis pengetahuan dokumen Anda.'\n"
-            f"3. Jangan pernah menebak atau memberikan informasi fiktif.\n\n"
-            f"KONTEKS DOKUMEN:\n{context if context else 'Belum ada dokumen.'}\n\n"
-            f"RIWAYAT:\n{history_text}\n"
-            f"PERTANYAAN: {query}\n\n"
-            f"Berikan jawaban analitis dalam {target_lang}."
-        )
+    f"Anda adalah G4 Expert System (Brain: {OLLAMA_MODEL}), asisten analitik yang siap membantu mengekstrak wawasan dari dokumen.\n\n"
+    f"Tugas Anda adalah menjawab pertanyaan pengguna secara komprehensif menggunakan referensi dari KONTEKS DOKUMEN di bawah ini.\n"
+    f"- Ekstrak fakta, poin penting, atau analisis yang relevan dengan pertanyaan.\n"
+    f"- Jika dokumen memuat istilah yang mirip dengan yang ditanyakan pengguna, hubungkan informasi tersebut secara logis.\n"
+    f"- Jika Anda tidak dapat menemukan jawaban sama sekali di dalam konteks, cukup sampaikan: 'Berdasarkan dokumen yang saya baca, saya belum menemukan informasi mengenai hal tersebut.'\n"
+    f"- Hindari memberikan jawaban spekulatif di luar konteks yang diberikan.\n\n"
+    f"KONTEKS DOKUMEN:\n{context if context else 'Belum ada dokumen.'}\n\n"
+    f"RIWAYAT PERCAKAPAN:\n{history_text}\n"
+    f"PERTANYAAN: {query}\n\n"
+    f"Berikan jawaban analitis dalam {target_lang}."
+    )
 
-        # 3. DYNAMIC ROUTING (LOCAL vs CLOUD) UNTUK GENERASI TEKS
         try:
             if mode == "local":
                 response = local_client.generate(model=OLLAMA_MODEL, prompt=system_prompt)
@@ -272,29 +301,34 @@ async def read_index():
 
 @app.post("/upload")
 async def upload_pdf(file: UploadFile = File(...), auth_ctx: dict = Depends(get_auth_context)):
-    temp_path = os.path.join(BASE_DIR, f"temp_{file.filename}")
+    temp_path = os.path.join(BASE_DIR, f"temp_{auth_ctx['session_id']}_{file.filename}")
+    
     try:
+        # 1. Simpan file fisik
         with open(temp_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
 
-        # Kirim seluruh auth_ctx, bukan hanya session_id
-        num_chunks = bot.process_pdf(temp_path, file.filename, auth_ctx)
+        # 2. Proses file dan tunggu (Mencegah server freeze dengan threadpool)
+        num_chunks = await run_in_threadpool(bot.process_pdf, temp_path, file.filename, auth_ctx)
         
+        # 3. Kembalikan data num_chunks langsung ke frontend
         return {
             "status": "success", 
-            "num_chunks": num_chunks, 
+            "message": "Dokumen berhasil diproses dan diindeks.",
+            "num_chunks": num_chunks,
             "filename": file.filename
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     finally:
+        # 4. SANGAT PENTING: Hapus file temp setelah proses selesai/gagal
         if os.path.exists(temp_path):
             os.remove(temp_path)
+            print(f"🗑️ File temporary dihapus: {temp_path}")
 
 @app.post("/delete_all_files")
 async def delete_all_files(auth_ctx: dict = Depends(get_auth_context)):
     try:
-        # Mengambil koleksi yang benar (Local/Cloud) lalu menghapus dokumen user
         collection = bot.get_collection(auth_ctx)
         collection.delete(where={"session_id": auth_ctx["session_id"]})
         return {"status": "success", "message": "Basis pengetahuan direset."}
@@ -303,7 +337,6 @@ async def delete_all_files(auth_ctx: dict = Depends(get_auth_context)):
 
 @app.post("/delete_file")
 async def delete_file(data: DeleteRequest, auth_ctx: dict = Depends(get_auth_context)):
-    print(f"DEBUG: Mencoba menghapus {data.filename} untuk sesi {auth_ctx['session_id']} (Mode: {auth_ctx['mode']})")
     success = bot.delete_document(data.filename, auth_ctx)
     if success:
         return {"status": "success"}
